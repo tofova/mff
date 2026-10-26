@@ -471,7 +471,7 @@ export async function registerGamingId(gamingId: string): Promise<{ success: boo
 
     const newUser: Omit<User, '_id'> = {
       gamingId,
-      coins: 800,
+      coins: 5000,
       createdAt: new Date(),
       referredByCode: referralCode,
       canSetGiftPassword: false,
@@ -489,7 +489,7 @@ export async function registerGamingId(gamingId: string): Promise<{ success: boo
 
     revalidatePath('/');
     const plainUser = JSON.parse(JSON.stringify(createdUser));
-    return { success: true, message: 'Registration successful! You have been awarded 800 coins.', user: plainUser };
+    return { success: true, message: 'Registration successful! You have been awarded 5000 coins.', user: plainUser };
   } catch (error) {
     console.error('Error registering Gaming ID:', error);
     return { success: false, message: 'An error occurred during registration.' };

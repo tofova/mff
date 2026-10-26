@@ -104,7 +104,7 @@ Garena is the official online shop for Free Fire players, headquartered in Singa
 Official & Trusted: 100% safe, verified items.
 Flexible Payments: Pay via UPI or ask support about Redeem Codes (email: garenaffmaxstore@gmail.com).
 Coin System:
-800 coins on first registration.
+5000 coins on first registration.
 5 coins for each ad watched.
 Coins auto-apply for discounts at checkout.
 Coins can be transferred to friends.

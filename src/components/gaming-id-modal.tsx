@@ -67,8 +67,8 @@ export default function GamingIdModal({ isOpen, onOpenChange }: GamingIdModalPro
       });
       onOpenChange(false);
       // Check if it's a new registration by looking at the welcome message
-      if (result.message.includes('800 coins')) {
-        setRegistrationSuccess({ coins: 800 });
+      if (result.message.includes('5000 coins')) {
+        setRegistrationSuccess({ coins: 5000 });
         // Fire Meta Pixel event for new registration
         if (typeof window.fbq === 'function') {
           window.fbq('track', 'CompleteRegistration');
@@ -151,7 +151,7 @@ export default function GamingIdModal({ isOpen, onOpenChange }: GamingIdModalPro
               />
           </div>
           <Button onClick={handleRegister} className="w-full" disabled={isLoading}>
-              {isLoading ? <Loader2 className="animate-spin" /> : 'Continue & get 800 coins'}
+              {isLoading ? <Loader2 className="animate-spin" /> : 'Continue & get 5000 coins'}
           </Button>
           </div>
         </DialogContent>
