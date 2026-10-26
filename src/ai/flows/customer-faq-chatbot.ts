@@ -150,6 +150,53 @@ Now, please answer the following user question based on the conversation history
 "{QUESTION}"
 `;
 
+/** Gemini model used for every answer (also named in the server log lines). */
+const MODEL = 'gemini-3.1-flash-lite';
+
+/**
+ * Retry policy. Google sometimes answers "503 This model is currently
+ * experiencing high demand" for a few seconds. Such attempts are repeated on
+ * the same model before giving up, so the user only sees the usual typing
+ * indicator a little longer. The delays are short on purpose: a 503 or 429
+ * comes back fast, and a live chat cannot afford long waits.
+ */
+const MAX_ATTEMPTS = 3;
+const RETRY_DELAYS_MS = [1000, 2000]; // before attempt 2, before attempt 3
+const REQUEST_TIMEOUT_MS = 30_000; // a hung attempt must not block the retries
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Whether a failed attempt is worth repeating. Overload (503), rate limiting
+ * (429), other 5xx, timeouts and connection errors are temporary. A 400, 401,
+ * 403 or 404 means the request itself (key, model name, payload) is wrong and
+ * would fail identically again, so those stop at once. A reply that is not in
+ * the expected JSON shape is also retried: a fresh generation usually fixes it.
+ */
+function isRetryableError(error: unknown): boolean {
+  if (axios.isAxiosError(error)) {
+    const status = error.response?.status;
+    if (status === undefined) return true; // timeout or connection problem
+    return status === 408 || status === 429 || status >= 500;
+  }
+  return true;
+}
+
+/** Short description of a failed attempt for the server log (never the URL, which carries the key). */
+function describeError(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const status = error.response?.status;
+    if (status === undefined) {
+      return error.code === 'ECONNABORTED'
+        ? `no response within ${REQUEST_TIMEOUT_MS}ms`
+        : `connection error (${error.code ?? error.message})`;
+    }
+    const apiError = (error.response?.data as { error?: { status?: string; message?: string } } | undefined)?.error;
+    return [`HTTP ${status}`, apiError?.status, apiError?.message].filter(Boolean).join(' ');
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
 /**
  * Calls the Google AI API directly to get an answer to a customer question.
  * @param input The customer's question and context.
@@ -189,39 +236,55 @@ export async function customerFAQChatbot(input: CustomerFAQChatbotInput): Promis
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY environment variable is not set.');
   }
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
 
   // 4. Construct the request payload
   const payload = {
     contents: [{ parts }],
   };
 
-  try {
-    // 5. Make the API call
-    const response = await axios.post(url, payload, {
-      headers: { 'Content-Type': 'application/json' },
-    });
+  // 5. Call the API, repeating transient failures on the same model (see the retry policy above).
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const response = await axios.post(url, payload, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: REQUEST_TIMEOUT_MS,
+      });
 
-    // 6. Extract the text response
-    const responseText = response.data.candidates[0].content.parts[0].text;
-    
-    // 7. Find and parse the JSON from the text response
-    const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
-    if (!jsonMatch || !jsonMatch[1]) {
-      console.error("Could not find JSON in AI response:", responseText);
-      throw new Error('AI response did not contain a valid JSON block.');
-    }
-    const parsedResponse = JSON.parse(jsonMatch[1]);
-    
-    const validation = CustomerFAQChatbotOutputSchema.safeParse(parsedResponse);
-    if (!validation.success) {
-      console.error("AI response validation error:", validation.error);
-      throw new Error('Received an invalid response format from the AI model.');
-    }
+      // 6. Extract the text response
+      const responseText = response.data.candidates[0].content.parts[0].text;
 
-    return validation.data;
-  } catch (error: any) {
-    console.error('Error calling Google AI API:', error.response ? error.response.data : error.message);
-    throw new Error('Failed to get a response from the AI model.');
+      // 7. Find and parse the JSON from the text response
+      const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
+      if (!jsonMatch || !jsonMatch[1]) {
+        console.error("Could not find JSON in AI response:", responseText);
+        throw new Error('AI response did not contain a valid JSON block.');
+      }
+      const parsedResponse = JSON.parse(jsonMatch[1]);
+
+      const validation = CustomerFAQChatbotOutputSchema.safeParse(parsedResponse);
+      if (!validation.success) {
+        console.error("AI response validation error:", validation.error);
+        throw new Error('Received an invalid response format from the AI model.');
+      }
+
+      if (attempt > 1) {
+        console.log(`[chatbot] ${MODEL} answered on attempt ${attempt}/${MAX_ATTEMPTS}`);
+      }
+      return validation.data;
+    } catch (error) {
+      const willRetry = attempt < MAX_ATTEMPTS && isRetryableError(error);
+      const delayMs = RETRY_DELAYS_MS[Math.min(attempt - 1, RETRY_DELAYS_MS.length - 1)];
+      console.error(
+        `[chatbot] ${MODEL} attempt ${attempt}/${MAX_ATTEMPTS} failed: ${describeError(error)}` +
+          (willRetry ? ` - retrying in ${delayMs}ms` : ' - giving up')
+      );
+      if (!willRetry) break;
+      await sleep(delayMs);
+    }
   }
+
+  // Same error as before, so askQuestion() keeps showing the user the usual
+  // "unable to answer at the moment" message.
+  throw new Error('Failed to get a response from the AI model.');
 }
