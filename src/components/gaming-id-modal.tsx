@@ -151,7 +151,7 @@ export default function GamingIdModal({ isOpen, onOpenChange }: GamingIdModalPro
               />
           </div>
           <Button onClick={handleRegister} className="w-full" disabled={isLoading}>
-              {isLoading ? <Loader2 className="animate-spin" /> : 'Continue & get 5000 coins'}
+              {isLoading ? <Loader2 className="animate-spin" /> : 'Continue'}
           </Button>
           </div>
         </DialogContent>
