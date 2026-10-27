@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { addCoinsToUser } from '@/app/actions';
 import { Loader2 } from 'lucide-react';
+import SendToAllUsersCard from './_components/send-to-all-users-card';
 
 export default function CoinManagementPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -59,6 +60,7 @@ export default function CoinManagementPage() {
           </form>
         </CardContent>
       </Card>
+      <SendToAllUsersCard />
     </div>
   );
 }
