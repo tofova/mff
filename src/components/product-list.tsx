@@ -119,7 +119,7 @@ export default function ProductList({ initialProducts, initialUser, initialOrder
   return (
     <section className="w-full py-6 md:py-10 lg:py-12 bg-background">
       <div className="container mx-auto px-4 md:px-6">
-        <h2 className="text-3xl md:text-4xl font-headline font-bold text-center mb-4 text-foreground">
+        <h2 className="ffi-heading text-3xl md:text-4xl font-headline font-bold text-center mb-4 text-foreground">
           Purchase Item Now
         </h2>
         

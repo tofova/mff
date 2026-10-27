@@ -20,6 +20,8 @@ import { askQuestion, getChatHistory } from '@/app/actions';
 import { ScrollArea } from './ui/scroll-area';
 import { type AiLog } from '@/lib/definitions';
 import { handleNotificationCardClick } from '@/lib/same-tab-notification-links';
+import { isFfIndiaThemeActive } from '@/lib/ff-india-theme';
+import { TricolourMark } from '@/components/ff-india-theme';
 import Image from 'next/image';
 import {
   Dialog,
@@ -214,7 +216,7 @@ export default function FaqChatbot() {
           <Image src="/img/robo.gif" alt="Chatbot" layout="fill" className="object-cover"/>
         </Button>
       </SheetTrigger>
-      <SheetContent className="flex flex-col">
+      <SheetContent className="flex flex-col ffi-panel">
         <SheetHeader className="mb-4">
           <SheetTitle className="font-headline text-xl flex items-center gap-2">
             <Sparkles className="text-primary w-6 h-6" />
@@ -222,6 +224,12 @@ export default function FaqChatbot() {
           </SheetTitle>
           <SheetDescription>
           Have a question? Ask me anything about our services. You can also upload an image (max 8MB).
+          {isFfIndiaThemeActive() && (
+            <span className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+              <TricolourMark className="h-2.5" />
+              Celebrating the Free Fire India launch
+            </span>
+          )}
           </SheetDescription>
         </SheetHeader>
         <div className="flex-grow mb-4 overflow-hidden">

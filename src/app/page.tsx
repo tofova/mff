@@ -8,9 +8,10 @@ import CoinSystem from '@/components/coin-system';
 import { ObjectId } from 'mongodb';
 import ProductList from '@/components/product-list';
 import { getSliderImages } from './admin/(protected)/slider-management/actions';
+import { isFfIndiaThemeActive } from '@/lib/ff-india-theme';
 
 
-export const metadata: Metadata = {
+const baseMetadata: Metadata = {
   metadataBase: new URL('https://www.garenafreefire.store'),
   title: 'Garena Store - Free Fire Top-Up & Diamonds',
   description: 'The official, secure, and trusted Garena store for discounted Free Fire diamonds, memberships, and top-ups. Get unbeatable prices on in-game items for Free Fire MAX.',
@@ -23,6 +24,13 @@ export const metadata: Metadata = {
     images: '/img/slider1.png'
   }
 };
+
+// While the Free Fire India launch theme is active the tab title mentions the launch;
+// afterwards it is exactly the title above again.
+export function generateMetadata(): Metadata {
+  if (!isFfIndiaThemeActive()) return baseMetadata;
+  return { ...baseMetadata, title: 'Garena Store - Free Fire India Launch | Top-Up & Diamonds' };
+}
 
 
 export default async function Home() {

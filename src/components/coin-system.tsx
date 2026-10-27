@@ -19,6 +19,8 @@ import { PasswordInput } from '@/app/account/_components/password-input';
 import { ScrollArea } from './ui/scroll-area';
 import { useRefresh } from '@/context/RefreshContext';
 import Radar from './layout/radar';
+import { isFfIndiaThemeActive } from '@/lib/ff-india-theme';
+import { IndiaMapLoop } from '@/components/ff-india-theme';
 
 
 interface CoinSystemProps {
@@ -329,7 +331,7 @@ export default function CoinSystem({ user: initialUser }: CoinSystemProps) {
             </Dialog>
           </div>
           <div className="flex justify-center items-center gap-2 pt-6">
-            <Radar />
+            {isFfIndiaThemeActive() ? <IndiaMapLoop /> : <Radar />}
             <span className="text-primary font-semibold">India</span>
           </div>
         </div>

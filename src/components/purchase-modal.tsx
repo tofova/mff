@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose, DialogTrigger } from '@/components/ui/dialog';
+import { isFfIndiaThemeActive } from '@/lib/ff-india-theme';
+import { FfIndiaRibbon } from '@/components/ff-india-theme';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -419,7 +421,7 @@ export default function PurchaseModal({ product, user: initialUser, onClose }: P
                     </div>
                     
                     <div className="flex flex-col items-center gap-2">
-                        <div className="p-2 bg-white rounded-lg border w-48 h-48 sm:w-44 sm:h-44 relative flex items-center justify-center">
+                        <div className="ffi-qr p-2 bg-white rounded-lg border w-48 h-48 sm:w-44 sm:h-44 relative flex items-center justify-center">
                             {isQrLoading ? (
                                 <Loader2 className="w-10 h-10 animate-spin text-primary" />
                             ) : (
@@ -428,6 +430,7 @@ export default function PurchaseModal({ product, user: initialUser, onClose }: P
                                         value={upiUrl}
                                         size={176}
                                         level="H"
+                                        bgColor={isFfIndiaThemeActive() ? 'transparent' : '#FFFFFF'}
                                         style={{ height: "auto", maxWidth: "100%", width: "100%" }}
                                         viewBox={`0 0 176 176`}
                                     />
@@ -518,7 +521,8 @@ export default function PurchaseModal({ product, user: initialUser, onClose }: P
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md" hideCloseButton={step === 'success'}>
+      <DialogContent className="sm:max-w-md ffi-panel" hideCloseButton={step === 'success'}>
+        {isFfIndiaThemeActive() && <FfIndiaRibbon className="absolute inset-x-0 top-0 sm:rounded-t-lg" />}
         {step !== 'success' && (
             <DialogClose asChild>
                 <button onClick={handleClose} className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">

@@ -4,12 +4,15 @@
 import { useEffect } from 'react';
 import { Coins } from 'lucide-react';
 import Image from 'next/image';
+import { isFfIndiaThemeActive } from '@/lib/ff-india-theme';
+import { TricolourMark } from '@/components/ff-india-theme';
 
 interface WelcomeAnimationProps {
   coins?: number;
 }
 
 export default function WelcomeAnimation({ coins }: WelcomeAnimationProps) {
+  const ffIndia = isFfIndiaThemeActive();
   useEffect(() => {
     const timer = setTimeout(() => {
       window.location.reload();
@@ -49,6 +52,12 @@ export default function WelcomeAnimation({ coins }: WelcomeAnimationProps) {
             <h1 className="text-4xl font-headline font-bold text-foreground animate-[fade-in-up_0.5s_ease-out_1.5s_forwards] opacity-0">
               {coins && coins > 0 ? 'Welcome!' : 'Welcome Back!'}
             </h1>
+            {ffIndia && (
+              <p className="mt-3 inline-flex items-center gap-2 font-headline text-sm font-semibold text-foreground/80 animate-[fade-in-up_0.5s_ease-out_1.6s_forwards] opacity-0">
+                <TricolourMark className="h-3" />
+                Free Fire India launch celebration
+              </p>
+            )}
             
             {coins && coins > 0 && (
               <div className="relative mt-4 h-24">
@@ -73,7 +82,7 @@ export default function WelcomeAnimation({ coins }: WelcomeAnimationProps) {
               (coins ? 'mt-0' : 'mt-8')
             }>
               <div
-                className="bg-primary h-1.5 rounded-full animate-progress-smooth"
+                className={ffIndia ? 'ffi-tricolour h-1.5 rounded-full animate-progress-smooth' : 'bg-primary h-1.5 rounded-full animate-progress-smooth'}
                 style={{'--duration': '3s', animationDelay: '0.5s', transform: 'translateX(-100%)'} as React.CSSProperties}
               ></div>
             </div>

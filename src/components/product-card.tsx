@@ -287,7 +287,7 @@ export default function ProductCard({ product, user, orders, control }: ProductC
         {product.tag && (
           <ProductTag tag={product.tag} color={product.tagColor} />
         )}
-        <Card className="flex flex-col overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+        <Card className="product-card flex flex-col overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
           <CardHeader className="p-0">
             <div className="relative aspect-video">
               <ProductMedia src={product.imageUrl} alt={product.name} dataAiHint={product.dataAiHint} />

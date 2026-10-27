@@ -27,9 +27,20 @@ import MetaPixelPurchaseTracker from '@/components/meta-pixel-purchase-tracker';
 import BrowserRedirect from '@/components/browser-redirect';
 import PresenceBeacon from '@/components/presence/presence-beacon';
 import { GOOGLE_ADS_ID } from '@/lib/google-ads';
+import { FF_INDIA_THEME_ATTR, isFfIndiaThemeActive } from '@/lib/ff-india-theme';
+import FfIndiaConfetti from '@/components/ff-india-confetti';
 
 
 const FCM_TOKEN_KEY = 'fcm_token';
+
+// While the Free Fire India theme is active the loading screen plays a short map animation;
+// keep it on screen at least this long so the drawing finishes even on fast connections.
+const FF_INDIA_SPLASH_MIN_MS = 3300;
+async function holdSplash(startedAt: number) {
+  if (!isFfIndiaThemeActive()) return;
+  const remaining = FF_INDIA_SPLASH_MIN_MS - (Date.now() - startedAt);
+  if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+}
 
 export default function RootLayout({
   children,
@@ -52,12 +63,14 @@ export default function RootLayout({
   const router = useRouter();
   const isAdPage = pathname === '/watch-ad';
   const isBlockedPage = pathname === '/blocked';
+  const ffIndiaActive = isFfIndiaThemeActive();
 
 
   const fetchInitialData = useCallback(async (isInitialLoad = false) => {
     if (isInitialLoad) {
       setIsLoading(true);
     }
+    const splashStartedAt = Date.now();
     const userData = await getUserData();
     setUser(userData);
     
@@ -92,6 +105,7 @@ export default function RootLayout({
       setPopupNotifications(popups);
     }
     if (isInitialLoad) {
+      await holdSplash(splashStartedAt);
       setIsLoading(false);
     }
   }, []);
@@ -276,12 +290,12 @@ export default function RootLayout({
   }
 
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full" data-theme={ffIndiaActive ? FF_INDIA_THEME_ATTR : undefined}>
       <head>
         <meta charSet="UTF-8" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Noto+Sans:wght@400;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Noto+Sans:wght@400;700&display=swap" rel="stylesheet" />
         <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet" />
         <link rel="manifest" href="/manifest.json" />
         <Script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3/dist/fp.min.js" strategy="afterInteractive" onLoad={handleFingerprint}></Script>
@@ -317,6 +331,7 @@ export default function RootLayout({
         </Script>
       </head>
       <body className={cn('font-body antialiased flex flex-col min-h-screen')}>
+        {ffIndiaActive && !isAdPage && <div aria-hidden="true" className="ffi-backdrop" />}
         <BrowserRedirect />
         <PresenceBeacon />
         <RefreshProvider>
@@ -334,6 +349,7 @@ export default function RootLayout({
             {!isAdPage && <Footer />}
           </div>
           <Toaster />
+          {ffIndiaActive && !isLoading && !isAdPage && <FfIndiaConfetti />}
           {popupNotifications.length > 0 && (
             <PopupNotification
               notification={popupNotifications[0]}

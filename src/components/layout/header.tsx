@@ -19,6 +19,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 import { cn } from '@/lib/utils';
+import { isFfIndiaThemeActive } from '@/lib/ff-india-theme';
+import { FfIndiaRibbon } from '@/components/ff-india-theme';
 
 
 interface HeaderProps {
@@ -33,6 +35,7 @@ export default function Header({ user, notifications, notificationKey, onNotific
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
+  const ffIndia = isFfIndiaThemeActive();
 
   const handleLogout = async () => {
     const result = await logoutUser();
@@ -55,6 +58,7 @@ export default function Header({ user, notifications, notificationKey, onNotific
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      {ffIndia && <FfIndiaRibbon className="ffi-ribbon-glide" />}
       <div className="container px-4 md:px-6 flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
            <Image src="/img/garena.png" alt="Garena Logo" width={32} height={23} className="w-8 h-auto" />
@@ -95,7 +99,7 @@ export default function Header({ user, notifications, notificationKey, onNotific
                   <span className="sr-only">Toggle navigation menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right">
+              <SheetContent side="right" className="ffi-panel">
                 <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                 <div className="flex flex-col gap-6 pt-10">
                   <Link

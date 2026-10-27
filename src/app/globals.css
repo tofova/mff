@@ -139,3 +139,236 @@
   animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 }
+
+/* ------------------------------------------------------------------------
+   Free Fire India launch celebration theme (see src/lib/ff-india-theme.ts).
+   Active only while the root layout sets <html data-theme="ff-india">.
+   Outside that window none of these rules apply and the site is unchanged.
+   ------------------------------------------------------------------------ */
+html[data-theme="ff-india"] {
+  /* Warm saffron-cream base for header, dialogs and inputs; cards stay white. */
+  --background: 33 100% 96%;
+  --secondary: 33 55% 92%;
+  --muted: 33 55% 92%;
+  --border: 33 40% 87%;
+  --input: 33 40% 87%;
+}
+
+.ffi-tricolour {
+  background: linear-gradient(90deg, #FF9933 0%, #FF9933 36%, #FFFFFF 50%, #138808 64%, #138808 100%);
+}
+
+/* Fixed tricolour backdrop: whatever part of the page is on screen, the top of the view is
+   saffron, the middle white and the bottom green. Content scrolls over it. */
+.ffi-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(180deg, #FFE6CC 0%, #FFF4E8 30%, #FFFFFF 50%, #EEF7EA 70%, #D6ECCF 100%);
+}
+/* Page sections painted in the solid base colour let the backdrop show through (form fields keep theirs). */
+html[data-theme="ff-india"] main .bg-background:not(input):not(select):not(textarea):not(button) {
+  background-color: transparent;
+}
+
+/* Panels: chatbot, notification bell, mobile menu, register popup, purchase popup, admin popup message. */
+html[data-theme="ff-india"] .ffi-panel {
+  background: linear-gradient(180deg, #FFE8D1 0%, #FFF8F0 26%, #FFFFFF 50%, #F7FBF5 74%, #DFF2DA 100%);
+}
+/* UPI QR code sits on a pale tricolour (modules stay black, so scanners read it as usual). */
+html[data-theme="ff-india"] .ffi-qr {
+  background: linear-gradient(180deg, #FFEEDC 0%, #FFFFFF 50%, #E6F4E1 100%);
+}
+
+/* Product cards: a 2px tricolour frame, saffron at the top edge, green at the bottom. */
+html[data-theme="ff-india"] .product-card {
+  position: relative;
+}
+@supports ((-webkit-mask-composite: xor) or (mask-composite: exclude)) {
+  html[data-theme="ff-india"] .product-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 2px;
+    pointer-events: none;
+    background: linear-gradient(180deg, #FF9933 0%, #FF9933 30%, #E3E3E3 50%, #138808 70%, #138808 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+  }
+}
+@supports not ((-webkit-mask-composite: xor) or (mask-composite: exclude)) {
+  html[data-theme="ff-india"] .product-card::before {
+    content: '';
+    display: block;
+    flex: none;
+    height: 3px;
+    background: linear-gradient(90deg, #FF9933 0%, #FF9933 36%, #FFFFFF 50%, #138808 64%, #138808 100%);
+  }
+}
+/* Buy button: white base with a clear saffron tint on the left and a green tint on the right;
+   the sliding white glow stays as it is. */
+html[data-theme="ff-india"] .product-card .animate-glowing-ray {
+  background: linear-gradient(90deg, #FFB366 0%, #FFDDBC 26%, #FFFFFF 50%, #CDEBC4 74%, #8CD27E 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+html[data-theme="ff-india"] .product-card .animate-glowing-ray:hover {
+  filter: brightness(0.97);
+}
+
+/* "Purchase Item Now": short tricolour underline whose colours keep flowing. */
+html[data-theme="ff-india"] .ffi-heading {
+  position: relative;
+  padding-bottom: 14px;
+}
+html[data-theme="ff-india"] .ffi-heading::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 84px;
+  height: 4px;
+  border-radius: 999px;
+  transform: translateX(-50%);
+  background-image: linear-gradient(90deg, #FF9933 0%, #FFFFFF 25%, #138808 50%, #FFFFFF 75%, #FF9933 100%);
+  background-size: 200% 100%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08), 0 2px 10px rgba(255, 153, 51, 0.25);
+  animation: ffi-glide 5s linear infinite;
+}
+
+/* Footer: translucent so the green end of the backdrop shows through. */
+html[data-theme="ff-india"] .ffi-footer {
+  background: rgba(214, 238, 206, 0.55);
+}
+
+/* Moving tricolour ribbon at the top of the header. Symmetric so the loop is seamless. */
+.ffi-ribbon-glide {
+  background-image: linear-gradient(90deg, #FF9933 0%, #FFFFFF 25%, #138808 50%, #FFFFFF 75%, #FF9933 100%);
+  background-size: 200% 100%;
+  animation: ffi-glide 8s linear infinite;
+}
+@keyframes ffi-glide {
+  0% { background-position: 0% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Tricolour confetti, once per session (src/components/ff-india-confetti.tsx). */
+.ffi-confetti-piece {
+  position: absolute;
+  top: -6%;
+  border-radius: 2px;
+  opacity: 0;
+  animation: ffi-confetti var(--ffi-duration, 3.5s) cubic-bezier(0.2, 0.6, 0.4, 1) var(--ffi-delay, 0s) forwards;
+  will-change: transform, opacity;
+}
+@keyframes ffi-confetti {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translate3d(var(--ffi-drift, 0px), 115vh, 0) rotate(720deg); opacity: 0; }
+}
+
+/* Loading screen: India's border is drawn north to south and back, then fills, then the F logo pops in. */
+.ffi-map-outline {
+  animation: ffi-draw 1.6s cubic-bezier(0.35, 0.1, 0.65, 0.9) forwards;
+}
+@keyframes ffi-draw {
+  to { stroke-dashoffset: 0; }
+}
+.ffi-map-islands {
+  opacity: 0;
+  animation: ffi-fade-in 0.5s ease-out 1.45s forwards;
+}
+.ffi-map-fill {
+  opacity: 0;
+  animation: ffi-fade-in 0.6s ease-out 1.55s forwards;
+}
+.ffi-f-logo {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.6);
+  filter: drop-shadow(0 0 1.5px rgba(31, 58, 147, 0.9)) drop-shadow(0 6px 12px rgba(0, 0, 0, 0.22));
+  /* Appears, vanishes and appears again, like the logo pulse the site always had. */
+  animation: ffi-pop-twice 1.5s ease-in-out 1.75s forwards;
+}
+@keyframes ffi-pop-twice {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  22% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  42% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  56% { opacity: 0; transform: translate(-50%, -50%) scale(0.75); }
+  78% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes ffi-fade-in {
+  to { opacity: 1; }
+}
+/* The F logo in tricolour: the yellow logo image is used as a mask over a tricolour fill. */
+.ffi-f-mask {
+  display: none;
+}
+@supports (mask-image: url("")) or (-webkit-mask-image: url("")) {
+  .ffi-f-mask {
+    display: block;
+    background: linear-gradient(180deg, #FF9933 0%, #FF9933 34%, #FFFFFF 50%, #138808 66%, #138808 100%);
+    -webkit-mask-image: url('/img/load.png');
+    mask-image: url('/img/load.png');
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+  }
+  .ffi-f-img {
+    display: none;
+  }
+}
+
+/* Small looping map beside "India" on the home page: draw, fill, hold, fade, repeat. */
+.ffi-loop-outline {
+  animation: ffi-loop-draw 4.6s ease-in-out infinite;
+}
+.ffi-loop-fill {
+  opacity: 0;
+  animation: ffi-loop-fill 4.6s ease-in-out infinite;
+}
+@keyframes ffi-loop-draw {
+  0% { stroke-dashoffset: var(--ffi-len); opacity: 1; }
+  52% { stroke-dashoffset: 0; opacity: 1; }
+  76% { stroke-dashoffset: 0; opacity: 1; }
+  88% { stroke-dashoffset: 0; opacity: 0; }
+  100% { stroke-dashoffset: var(--ffi-len); opacity: 0; }
+}
+@keyframes ffi-loop-fill {
+  0%, 40% { opacity: 0; }
+  58%, 76% { opacity: 0.95; }
+  88%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ffi-confetti-piece,
+  .ffi-ribbon-glide {
+    animation: none;
+  }
+  .ffi-map-outline,
+  .ffi-loop-outline {
+    animation: none;
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  .ffi-map-fill,
+  .ffi-map-islands,
+  .ffi-loop-fill {
+    animation: none;
+    opacity: 1;
+  }
+  .ffi-heading::after {
+    animation: none;
+  }
+  .ffi-f-logo {
+    animation: none;
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}

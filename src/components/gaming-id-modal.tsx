@@ -2,6 +2,8 @@
 'use client';
 
 import { useState } from 'react';
+import { isFfIndiaThemeActive } from '@/lib/ff-india-theme';
+import { FfIndiaChip, FfIndiaRibbon } from '@/components/ff-india-theme';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -108,6 +110,8 @@ export default function GamingIdModal({ isOpen, onOpenChange }: GamingIdModalPro
     onOpenChange(open);
   }
 
+  const ffIndia = isFfIndiaThemeActive();
+
   if (registrationSuccess) {
     return <WelcomeAnimation coins={registrationSuccess.coins} />;
   }
@@ -117,7 +121,7 @@ export default function GamingIdModal({ isOpen, onOpenChange }: GamingIdModalPro
       <Dialog open={isOpen} onOpenChange={handleOpenChangeWithReset}>
         <DialogContent
           className={cn(
-            'sm:max-w-md transition-all duration-300 ease-in-out',
+            'sm:max-w-md transition-all duration-300 ease-in-out ffi-panel',
             isMobile && isShifted && 'top-[41%]'
           )}
           onOpenAutoFocus={(e) => {
@@ -126,7 +130,9 @@ export default function GamingIdModal({ isOpen, onOpenChange }: GamingIdModalPro
             }
           }}
         >
+          {ffIndia && <FfIndiaRibbon className="absolute inset-x-0 top-0 sm:rounded-t-lg" />}
           <DialogHeader>
+          {ffIndia && <FfIndiaChip label="Free Fire India launch celebration" className="self-center sm:self-start" />}
           <DialogTitle className="text-2xl font-headline">Welcome to Garena Store</DialogTitle>
           <DialogDescription>
               Please enter your Free Fire Gaming ID to get started and receive your welcome bonus!

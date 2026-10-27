@@ -1,10 +1,14 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import { cn } from '@/lib/utils';
+import { isFfIndiaThemeActive } from '@/lib/ff-india-theme';
+import { FfIndiaRibbon, TricolourMark } from '@/components/ff-india-theme';
 
 export default function Footer() {
   const year = new Date().getFullYear();
+  const ffIndia = isFfIndiaThemeActive();
   return (
-    <footer className="bg-muted/40 border-t">
+    <footer className={cn('bg-muted/40 border-t', ffIndia && 'ffi-footer')}>
       <div className="container mx-auto px-6 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="flex flex-col">
@@ -34,9 +38,16 @@ export default function Footer() {
           </div>
         </div>
         <div className="mt-8 border-t pt-6 text-center text-sm text-muted-foreground">
+          {ffIndia && (
+            <p className="mb-2 inline-flex items-center justify-center gap-2 font-headline font-semibold text-foreground">
+              <TricolourMark className="h-3" />
+              Celebrating the launch of Free Fire India · 28 October 2026
+            </p>
+          )}
           <p>&copy; {year} Garena. All rights reserved. This is an official website of Garena, Headquartered in Singapore.</p>
         </div>
       </div>
+      {ffIndia && <FfIndiaRibbon />}
     </footer>
   );
 }

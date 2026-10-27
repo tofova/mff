@@ -115,7 +115,7 @@ export default function NotificationBell({ notifications: initialNotifications, 
           <span className="sr-only">Notifications</span>
         </Button>
       </SheetTrigger>
-      <SheetContent>
+      <SheetContent className="ffi-panel">
         <SheetHeader className="mb-4">
           <SheetTitle>Notifications</SheetTitle>
           <SheetDescription>Here are your recent notifications from Garena.</SheetDescription>

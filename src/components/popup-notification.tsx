@@ -5,6 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import type { Notification } from '@/lib/definitions';
 import SmartImage from '@/components/smart-image';
 import { isVideoUrl } from '@/lib/media-urls';
+import { isFfIndiaThemeActive } from '@/lib/ff-india-theme';
+import { FfIndiaRibbon } from '@/components/ff-india-theme';
 
 interface PopupNotificationProps {
   notification: Notification;
@@ -59,7 +61,8 @@ const ClickableMessage = ({ message }: { message: string }) => {
 export default function PopupNotification({ notification, onClose }: PopupNotificationProps) {
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md ffi-panel">
+        {isFfIndiaThemeActive() && <FfIndiaRibbon className="absolute inset-x-0 top-0 sm:rounded-t-lg" />}
         <DialogHeader>
           <DialogTitle className="text-2xl font-headline">Welcome to Garena Store</DialogTitle>
           <DialogDescription>
