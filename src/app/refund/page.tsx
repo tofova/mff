@@ -16,7 +16,7 @@ export default function RefundPolicyPage() {
   }, []);
 
   return (
-    <div className="bg-background">
+    <div className="ffi-clear bg-background">
       <div className="container mx-auto px-6 py-16">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-4xl md:text-5xl font-bold font-headline text-primary mb-6 text-center">

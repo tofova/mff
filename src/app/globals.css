@@ -167,8 +167,8 @@ html[data-theme="ff-india"] {
   pointer-events: none;
   background: linear-gradient(180deg, #FFE6CC 0%, #FFF4E8 30%, #FFFFFF 50%, #EEF7EA 70%, #D6ECCF 100%);
 }
-/* Page sections painted in the solid base colour let the backdrop show through (form fields keep theirs). */
-html[data-theme="ff-india"] main .bg-background:not(input):not(select):not(textarea):not(button) {
+/* Only the home product section and the plain info pages let the backdrop show through. */
+html[data-theme="ff-india"] .ffi-clear {
   background-color: transparent;
 }
 
