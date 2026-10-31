@@ -33,13 +33,13 @@ import {
     AlertTriangle, BellMinus, ChevronLeft, ChevronRight, Copy, ExternalLink, Headset, Link2, Loader2, Search,
     ShieldAlert, Trash2, Type, X,
 } from 'lucide-react';
-import type { CleanupBatch, CleanupCriteria, CleanupPlan, CleanupRow, CleanupRowsPage, CleanupSelection, CleanupTextMode } from '@/lib/notification-cleanup';
-import { discardBackup, getCleanup, getCleanupPlan, getCleanupRows, getRecentCleanups, startCleanup, undoCleanup } from '../actions';
+import type { CleanupBatch, CleanupBatchesPage, CleanupCriteria, CleanupPlan, CleanupRow, CleanupRowsPage, CleanupSelection, CleanupTextMode } from '@/lib/notification-cleanup';
+import { discardBackup, getCleanup, getCleanupHistory, getCleanupPlan, getCleanupRows, startCleanup, undoCleanup } from '../actions';
 import CleanupHistory, { BackupLine, DiscardButton, UndoButton } from './cleanup-history';
 import { CleanupStatusBadge, ReasonList, WhenIST, criteriaSummary, fmtInt, isBatchBusy, plural } from './cleanup-ui';
 
 interface NotificationCleanupProps {
-    initialBatches: CleanupBatch[];
+    initialHistory: CleanupBatchesPage;
 }
 
 const EMPTY_CRITERIA: CleanupCriteria = {
@@ -66,7 +66,8 @@ function Snippet({ row }: { row: CleanupRow }) {
     );
 }
 
-export default function NotificationCleanup({ initialBatches }: NotificationCleanupProps) {
+export default function NotificationCleanup({ initialHistory }: NotificationCleanupProps) {
+    const initialBatches = initialHistory.batches;
     const { toast } = useToast();
 
     // --- criteria being typed, and the criteria that was actually searched ---------
@@ -94,6 +95,38 @@ export default function NotificationCleanup({ initialBatches }: NotificationClea
     const [confirmText, setConfirmText] = useState('');
     const [activeBatch, setActiveBatch] = useState<CleanupBatch | null>(() => initialBatches.find(isBatchBusy) ?? null);
     const [batches, setBatches] = useState<CleanupBatch[]>(initialBatches);
+    const [historyTotal, setHistoryTotal] = useState(initialHistory.total);
+    const [historyPages, setHistoryPages] = useState(1);
+    const [loadingMore, setLoadingMore] = useState(false);
+
+    /** Reload every history page currently shown (so an expanded list stays expanded). */
+    const reloadHistory = useCallback(async (pages: number) => {
+        const results: CleanupBatchesPage[] = [];
+        for (let p = 1; p <= pages; p++) {
+            const data = await getCleanupHistory(p);
+            results.push(data);
+            if (data.batches.length < data.pageSize) break;
+        }
+        if (results.length === 0) return;
+        setBatches(results.flatMap((r) => r.batches));
+        setHistoryTotal(results[results.length - 1].total);
+        setHistoryPages(results.length);
+    }, []);
+
+    const showMoreHistory = async () => {
+        setLoadingMore(true);
+        try {
+            const data = await getCleanupHistory(historyPages + 1);
+            setBatches((prev) => {
+                const seen = new Set(prev.map((b) => b.id));
+                return [...prev, ...data.batches.filter((b) => !seen.has(b.id))];
+            });
+            setHistoryTotal(data.total);
+            setHistoryPages(data.page);
+        } finally {
+            setLoadingMore(false);
+        }
+    };
     const [isStarting, startStarting] = useTransition();
     const [pendingAction, setPendingAction] = useState(false);
 
@@ -200,8 +233,8 @@ export default function NotificationCleanup({ initialBatches }: NotificationClea
         if (!wasBusy.current) return;
         wasBusy.current = false;
         setReloadTick((t) => t + 1);
-        getRecentCleanups().then(setBatches).catch(() => { /* best-effort */ });
-    }, [activeBusy]);
+        reloadHistory(historyPages).catch(() => { /* best-effort */ });
+    }, [activeBusy]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // --- ticks ------------------------------------------------------------------------------------
     const isTicked = (row: CleanupRow): boolean => {
@@ -259,9 +292,9 @@ export default function NotificationCleanup({ initialBatches }: NotificationClea
         try {
             const res = await discardBackup(batchId);
             toast({ variant: res.success ? 'default' : 'destructive', title: res.success ? 'Backup discarded' : 'Not discarded', description: res.message });
-            const [fresh, list] = await Promise.all([getCleanup(batchId), getRecentCleanups()]);
+            const fresh = await getCleanup(batchId);
             if (fresh && activeBatch?.id === batchId) setActiveBatch(fresh);
-            setBatches(list);
+            await reloadHistory(historyPages);
         } finally {
             setPendingAction(false);
         }
@@ -612,7 +645,16 @@ export default function NotificationCleanup({ initialBatches }: NotificationClea
                 </AlertDialogContent>
             </AlertDialog>
 
-            <CleanupHistory batches={batches} busy={busy} currentId={activeBatch?.id ?? null} onUndo={handleUndo} onDiscard={handleDiscard} />
+            <CleanupHistory
+                batches={batches}
+                total={historyTotal}
+                loadingMore={loadingMore}
+                onShowMore={showMoreHistory}
+                busy={busy}
+                currentId={activeBatch?.id ?? null}
+                onUndo={handleUndo}
+                onDiscard={handleDiscard}
+            />
         </div>
     );
 }

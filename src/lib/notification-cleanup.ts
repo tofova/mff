@@ -663,6 +663,26 @@ export async function listCleanupBatches(db: Db, limit = 20): Promise<CleanupBat
     return withBackupCounts(db, docs);
 }
 
+export interface CleanupBatchesPage {
+    batches: CleanupBatch[];
+    /** All kept cleanups (at most CLEANUP_LIMITS.keepBatches). */
+    total: number;
+    page: number;
+    pageSize: number;
+}
+
+/** One page of the kept cleanups, newest first, so the history can be shown 20 at a time. */
+export async function listCleanupBatchesPage(db: Db, page = 1, pageSize = 20): Promise<CleanupBatchesPage> {
+    const size = Math.min(Math.max(pageSize, 1), CLEANUP_LIMITS.keepBatches);
+    const pageNo = Math.max(page, 1);
+    await failStaleBatches(db);
+    const [total, docs] = await Promise.all([
+        batchesCol(db).countDocuments({}),
+        batchesCol(db).find({}, { sort: { createdAt: -1 }, skip: (pageNo - 1) * size, limit: size }).toArray(),
+    ]);
+    return { batches: await withBackupCounts(db, docs), total, page: pageNo, pageSize: size };
+}
+
 /** Create a cleanup batch (status running). The caller then starts `runCleanup` in the background. */
 export async function createCleanup(
     db: Db,

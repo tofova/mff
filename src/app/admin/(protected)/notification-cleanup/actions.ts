@@ -20,13 +20,14 @@ import {
     createCleanup,
     discardCleanupBackup,
     getCleanupBatch,
-    listCleanupBatches,
+    listCleanupBatchesPage,
     listCleanupRows,
     planCleanup,
     runCleanup,
     runCleanupUndo,
     startCleanupUndo,
     type CleanupBatch,
+    type CleanupBatchesPage,
     type CleanupPlan,
     type CleanupRowsPage,
 } from '@/lib/notification-cleanup';
@@ -127,14 +128,16 @@ export async function discardBackup(batchId: string): Promise<{ success: boolean
     }
 }
 
-export async function getRecentCleanups(): Promise<CleanupBatch[]> {
+/** One page (20) of the kept cleanups; the list shows them with "Show more". */
+export async function getCleanupHistory(page: number): Promise<CleanupBatchesPage> {
     noStore();
-    if (!(await isAdminAuthenticated())) return [];
+    const empty: CleanupBatchesPage = { batches: [], total: 0, page: 1, pageSize: 20 };
+    if (!(await isAdminAuthenticated())) return empty;
     try {
         const db = await connectToDatabase();
-        return await listCleanupBatches(db, 20);
+        return await listCleanupBatchesPage(db, page, 20);
     } catch (error) {
         console.error('[notification-cleanup] could not list batches:', error);
-        return [];
+        return empty;
     }
 }

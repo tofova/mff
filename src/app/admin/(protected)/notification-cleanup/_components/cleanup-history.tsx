@@ -12,12 +12,16 @@ import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
     AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { History, Loader2, Trash2, Undo2 } from 'lucide-react';
+import { ChevronDown, History, Loader2, Trash2, Undo2 } from 'lucide-react';
 import type { CleanupBatch } from '@/lib/notification-cleanup';
 import { CleanupStatusBadge, ReasonList, WhenIST, backupState, criteriaSummary, fmtInt, plural } from './cleanup-ui';
 
 interface CleanupHistoryProps {
     batches: CleanupBatch[];
+    /** All kept cleanups, of which `batches` holds the first pages. */
+    total: number;
+    loadingMore: boolean;
+    onShowMore: () => void;
     busy: boolean;
     currentId: string | null;
     onUndo: (batchId: string) => Promise<void>;
@@ -99,7 +103,7 @@ export function DiscardButton({ batch, busy, pending, onDiscard, size = 'sm' }: 
     );
 }
 
-export default function CleanupHistory({ batches, busy, currentId, onUndo, onDiscard }: CleanupHistoryProps) {
+export default function CleanupHistory({ batches, total, loadingMore, onShowMore, busy, currentId, onUndo, onDiscard }: CleanupHistoryProps) {
     const [pendingId, setPendingId] = useState<string | null>(null);
     if (batches.length === 0) return null;
 
@@ -118,7 +122,10 @@ export default function CleanupHistory({ batches, busy, currentId, onUndo, onDis
         <Card>
             <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg"><History className="h-5 w-5" /> Recent cleanups</CardTitle>
-                <CardDescription>Each cleanup keeps a backup of what it deleted for 7 days, unless you discard it earlier.</CardDescription>
+                <CardDescription>
+                    The last 50 cleanups are kept. Each keeps a backup of what it deleted for 7 days, unless you discard it earlier.
+                    {total > batches.length && <> Showing {fmtInt(batches.length)} of {fmtInt(total)}.</>}
+                </CardDescription>
             </CardHeader>
             <CardContent>
                 <ul className="divide-y">
@@ -148,6 +155,14 @@ export default function CleanupHistory({ batches, busy, currentId, onUndo, onDis
                         </li>
                     ))}
                 </ul>
+                {batches.length < total && (
+                    <div className="flex justify-center pt-3">
+                        <Button variant="outline" size="sm" onClick={onShowMore} disabled={loadingMore}>
+                            {loadingMore ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <ChevronDown className="mr-1 h-4 w-4" />}
+                            Show more ({fmtInt(batches.length)} of {fmtInt(total)})
+                        </Button>
+                    </div>
+                )}
             </CardContent>
         </Card>
     );
