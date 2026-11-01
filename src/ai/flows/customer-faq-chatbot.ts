@@ -155,14 +155,35 @@ const MODEL = 'gemini-3.1-flash-lite';
 
 /**
  * Retry policy. Google sometimes answers "503 This model is currently
- * experiencing high demand" for a few seconds. Such attempts are repeated on
- * the same model before giving up, so the user only sees the usual typing
- * indicator a little longer. The delays are short on purpose: a 503 or 429
- * comes back fast, and a live chat cannot afford long waits.
+ * experiencing high demand" for a few seconds. Such an attempt is repeated
+ * once on the same model, so the user only sees the usual typing indicator a
+ * little longer. The delay is short on purpose: a 503 or 429 comes back fast,
+ * and a live chat cannot afford long waits. When the retry fails as well, the
+ * fallback model below answers instead of giving up.
  */
-const MAX_ATTEMPTS = 3;
-const RETRY_DELAYS_MS = [1000, 2000]; // before attempt 2, before attempt 3
-const REQUEST_TIMEOUT_MS = 30_000; // a hung attempt must not block the retries
+const MAX_ATTEMPTS = 2;
+const RETRY_DELAYS_MS = [1000]; // before attempt 2
+const REQUEST_TIMEOUT_MS = 60_000; // big screenshots sometimes need more than 30 s; a hung attempt must still not block the fallback
+
+/**
+ * Fallback model, used only after every Gemini attempt failed. It runs on
+ * Cloudflare Workers AI, a separate provider, so a Google-side overload no
+ * longer leaves the user without an answer. It needs CLOUDFLARE_AI_ACCOUNT_ID
+ * and CLOUDFLARE_AI_API_TOKEN in the runtime environment (never NEXT_PUBLIC_).
+ * When either is missing the fallback is skipped and this file behaves exactly
+ * as it did before.
+ */
+const FALLBACK_MODEL = '@cf/google/gemma-4-26b-a4b-it';
+const FALLBACK_TIMEOUT_MS = 45_000;
+/** Answers are a few sentences; this only stops a runaway reply. */
+const FALLBACK_MAX_TOKENS = 1024;
+/** Hard cap on a fallback answer, which may arrive as plain text. */
+const FALLBACK_MAX_ANSWER_CHARS = 6000;
+/** Sent as the system message so the fallback model treats the prompt above exactly like Gemini does. */
+const FALLBACK_SYSTEM_PROMPT =
+  'You are the customer support chatbot described in the user message. Follow every rule in it exactly, ' +
+  'including the language rule and the response format: reply with only the JSON object it asks for, ' +
+  'inside a ```json code block, and nothing else.';
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -172,6 +193,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
  * 403 or 404 means the request itself (key, model name, payload) is wrong and
  * would fail identically again, so those stop at once. A reply that is not in
  * the expected JSON shape is also retried: a fresh generation usually fixes it.
+ * Whatever the reason, once the attempts are used up the fallback model is asked.
  */
 function isRetryableError(error: unknown): boolean {
   if (axios.isAxiosError(error)) {
@@ -182,19 +204,153 @@ function isRetryableError(error: unknown): boolean {
   return true;
 }
 
-/** Short description of a failed attempt for the server log (never the URL, which carries the key). */
+/**
+ * Short description of a failed attempt for the server log. Never the URL
+ * (Google's carries the key) and never the request headers (Cloudflare's carry
+ * the token): only the status and the provider's message.
+ */
 function describeError(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const status = error.response?.status;
     if (status === undefined) {
       return error.code === 'ECONNABORTED'
-        ? `no response within ${REQUEST_TIMEOUT_MS}ms`
+        ? `no response within ${error.config?.timeout ?? '?'}ms`
         : `connection error (${error.code ?? error.message})`;
     }
-    const apiError = (error.response?.data as { error?: { status?: string; message?: string } } | undefined)?.error;
-    return [`HTTP ${status}`, apiError?.status, apiError?.message].filter(Boolean).join(' ');
+    // Google answers { error: { status, message } }, Cloudflare { errors: [{ code, message }] }.
+    const data = error.response?.data as
+      | { error?: { status?: string; message?: string }; errors?: { code?: number; message?: string }[] }
+      | undefined;
+    return [`HTTP ${status}`, data?.error?.status, data?.error?.message, data?.errors?.[0]?.message]
+      .filter(Boolean)
+      .join(' ');
   }
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * The reply Gemini is asked for: a ```json block holding {"answer": "..."}.
+ * Anything else counts as a failed attempt (unchanged behaviour).
+ */
+function parseStrictAnswer(responseText: string): CustomerFAQChatbotOutput {
+  const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
+  if (!jsonMatch || !jsonMatch[1]) {
+    console.error("Could not find JSON in AI response:", responseText);
+    throw new Error('AI response did not contain a valid JSON block.');
+  }
+  const parsedResponse = JSON.parse(jsonMatch[1]);
+
+  const validation = CustomerFAQChatbotOutputSchema.safeParse(parsedResponse);
+  if (!validation.success) {
+    console.error("AI response validation error:", validation.error);
+    throw new Error('Received an invalid response format from the AI model.');
+  }
+  return validation.data;
+}
+
+/** Trims a fallback answer and cuts it at the hard cap. */
+function capAnswer(answer: string): string {
+  const trimmed = answer.trim();
+  return trimmed.length > FALLBACK_MAX_ANSWER_CHARS ? `${trimmed.slice(0, FALLBACK_MAX_ANSWER_CHARS)}…` : trimmed;
+}
+
+/** Undoes JSON string escapes ("\n", "\"", "\\") in text that was cut out of a JSON literal. */
+function unescapeJsonString(literalBody: string): string {
+  try {
+    const parsed = JSON.parse(`"${literalBody}"`);
+    return typeof parsed === 'string' ? parsed : literalBody;
+  } catch {
+    return literalBody.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+  }
+}
+
+/**
+ * The fallback model is not guaranteed to honour the JSON instruction, so its
+ * reply is accepted in this order: the ```json block, a bare JSON object, the
+ * "answer" value of a JSON object that is otherwise broken or cut off, and
+ * finally the whole text. Whatever the shape, the result is only ever a string:
+ * it is validated, trimmed and capped here, stored as text by askQuestion() and
+ * rendered as text by React, so nothing in it can run. An empty reply fails.
+ */
+function parseLenientAnswer(responseText: string): CustomerFAQChatbotOutput {
+  const text = responseText.trim();
+
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)?.[1];
+  for (const candidate of [fenced, text]) {
+    if (!candidate) continue;
+    try {
+      const validation = CustomerFAQChatbotOutputSchema.safeParse(JSON.parse(candidate));
+      if (validation.success && validation.data.answer.trim()) {
+        return { answer: capAnswer(validation.data.answer) };
+      }
+    } catch {
+      // Not JSON: try the next shape.
+    }
+  }
+
+  const answerKey = text.match(/"answer"\s*:\s*"/);
+  if (answerKey && answerKey.index !== undefined) {
+    const rest = text.slice(answerKey.index + answerKey[0].length);
+    // A complete string literal when the closing quote is there; otherwise the
+    // reply was cut off, so take what is there minus a trailing code fence.
+    const literalBody = rest.match(/^((?:[^"\\]|\\.)*)"/)?.[1] ?? rest.replace(/\s*```\s*$/, '');
+    const answer = unescapeJsonString(literalBody);
+    if (answer.trim()) return { answer: capAnswer(answer) };
+  }
+
+  const plain = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  if (!plain) throw new Error('Fallback model returned an empty answer.');
+  return { answer: capAnswer(plain) };
+}
+
+/** The fallback configuration from the environment, or null when it is not set up. */
+function fallbackConfig(): { accountId: string; apiToken: string } | null {
+  const accountId = (process.env.CLOUDFLARE_AI_ACCOUNT_ID ?? '').trim();
+  const apiToken = (process.env.CLOUDFLARE_AI_API_TOKEN ?? '').trim();
+  return accountId && apiToken ? { accountId, apiToken } : null;
+}
+
+/**
+ * Asks the fallback model the very same prompt. The prompt is the user message;
+ * the screenshot, if any, travels with it as an OpenAI-style image part, which
+ * is how Workers AI accepts data URIs. The model's reasoning mode is switched
+ * off on purpose: with it on, the whole token budget goes to hidden reasoning
+ * and the answer never arrives. The token is sent in a header, never in the URL.
+ */
+async function askFallbackModel(
+  config: { accountId: string; apiToken: string },
+  fullPrompt: string,
+  mediaDataUri?: string
+): Promise<CustomerFAQChatbotOutput> {
+  const userContent = mediaDataUri
+    ? [
+        { type: 'text', text: fullPrompt },
+        { type: 'image_url', image_url: { url: mediaDataUri } },
+      ]
+    : fullPrompt;
+
+  const response = await axios.post(
+    `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(config.accountId)}/ai/v1/chat/completions`,
+    {
+      model: FALLBACK_MODEL,
+      messages: [
+        { role: 'system', content: FALLBACK_SYSTEM_PROMPT },
+        { role: 'user', content: userContent },
+      ],
+      max_completion_tokens: FALLBACK_MAX_TOKENS,
+      chat_template_kwargs: { enable_thinking: false },
+    },
+    {
+      headers: { Authorization: `Bearer ${config.apiToken}`, 'Content-Type': 'application/json' },
+      timeout: FALLBACK_TIMEOUT_MS,
+    }
+  );
+
+  const text = response.data?.choices?.[0]?.message?.content;
+  if (typeof text !== 'string' || !text.trim()) {
+    throw new Error('Fallback model returned no text.');
+  }
+  return parseLenientAnswer(text);
 }
 
 /**
@@ -243,7 +399,8 @@ export async function customerFAQChatbot(input: CustomerFAQChatbotInput): Promis
     contents: [{ parts }],
   };
 
-  // 5. Call the API, repeating transient failures on the same model (see the retry policy above).
+  // 5. Call the API, repeating a transient failure once on the same model (see the retry policy above).
+  const fallback = fallbackConfig();
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
       const response = await axios.post(url, payload, {
@@ -251,40 +408,41 @@ export async function customerFAQChatbot(input: CustomerFAQChatbotInput): Promis
         timeout: REQUEST_TIMEOUT_MS,
       });
 
-      // 6. Extract the text response
+      // 6. Extract the text response and parse the JSON block it must contain
       const responseText = response.data.candidates[0].content.parts[0].text;
-
-      // 7. Find and parse the JSON from the text response
-      const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
-      if (!jsonMatch || !jsonMatch[1]) {
-        console.error("Could not find JSON in AI response:", responseText);
-        throw new Error('AI response did not contain a valid JSON block.');
-      }
-      const parsedResponse = JSON.parse(jsonMatch[1]);
-
-      const validation = CustomerFAQChatbotOutputSchema.safeParse(parsedResponse);
-      if (!validation.success) {
-        console.error("AI response validation error:", validation.error);
-        throw new Error('Received an invalid response format from the AI model.');
-      }
+      const result = parseStrictAnswer(responseText);
 
       if (attempt > 1) {
         console.log(`[chatbot] ${MODEL} answered on attempt ${attempt}/${MAX_ATTEMPTS}`);
       }
-      return validation.data;
+      return result;
     } catch (error) {
       const willRetry = attempt < MAX_ATTEMPTS && isRetryableError(error);
       const delayMs = RETRY_DELAYS_MS[Math.min(attempt - 1, RETRY_DELAYS_MS.length - 1)];
-      console.error(
-        `[chatbot] ${MODEL} attempt ${attempt}/${MAX_ATTEMPTS} failed: ${describeError(error)}` +
-          (willRetry ? ` - retrying in ${delayMs}ms` : ' - giving up')
-      );
+      const next = willRetry
+        ? ` - retrying in ${delayMs}ms`
+        : fallback
+          ? ` - falling back to ${FALLBACK_MODEL}`
+          : ' - giving up';
+      console.error(`[chatbot] ${MODEL} attempt ${attempt}/${MAX_ATTEMPTS} failed: ${describeError(error)}${next}`);
       if (!willRetry) break;
       await sleep(delayMs);
     }
   }
 
-  // Same error as before, so askQuestion() keeps showing the user the usual
-  // "unable to answer at the moment" message.
-  throw new Error('Failed to get a response from the AI model.');
+  // 7. Every Gemini attempt failed: hand the same prompt to the fallback model.
+  //    If that fails too, the error is the same as before, so askQuestion()
+  //    keeps showing the user the usual "unable to answer at the moment" message.
+  if (!fallback) {
+    console.error('[chatbot] fallback skipped: CLOUDFLARE_AI_ACCOUNT_ID or CLOUDFLARE_AI_API_TOKEN is not set - giving up');
+    throw new Error('Failed to get a response from the AI model.');
+  }
+  try {
+    const result = await askFallbackModel(fallback, fullPrompt, mediaDataUri);
+    console.log(`[chatbot] ${FALLBACK_MODEL} answered after ${MODEL} failed`);
+    return result;
+  } catch (error) {
+    console.error(`[chatbot] ${FALLBACK_MODEL} failed: ${describeError(error)} - giving up`);
+    throw new Error('Failed to get a response from the AI model.');
+  }
 }
