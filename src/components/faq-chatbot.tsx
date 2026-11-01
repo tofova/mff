@@ -51,7 +51,9 @@ const FormattedDate = ({ date }: { date?: Date }) => {
 
 const ClickableMessageContent = ({ text }: { text: string }) => {
   const router = useRouter();
-  const urlRegex = /(https?:\/\/[^\s]+|[\w-.]+@[\w-]+\.[\w-.]+)/g;
+  // A link may not end in punctuation: a sentence-ending ".", ",", "?" or ")"
+  // right after a URL or e-mail stays plain text, so the link itself stays valid.
+  const urlRegex = /(https?:\/\/[^\s]*[^\s.,;:!?)\]'"]|[\w.-]+@[\w-]+(?:\.[\w-]+)+)/g;
   const parts = text.split(urlRegex);
 
   return (
