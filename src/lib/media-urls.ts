@@ -34,7 +34,6 @@ export const IMAGE_HOST_PATTERNS: readonly string[] = [
   'drive.google.com',
   '*.postimg.cc',
   'rzp.io',
-  'res.cloudinary.com',
 
   // Cloudflare
   '*.r2.dev', // R2 public bucket URLs (pub-<id>.r2.dev)
