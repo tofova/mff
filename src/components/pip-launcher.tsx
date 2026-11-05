@@ -6,8 +6,9 @@
  *
  * `public/pip/pip-mascot.js` is an unedited copy of the artifact's 2D script.
  * Everything specific to this site is applied from here, on the outside:
- * colours, size, greeting, layering and what a click does. A newer copy of the
- * script can therefore replace that file without merging anything.
+ * colours, size, layering, what a click does, and what Pip does and says while
+ * it waits. A newer copy of the script can therefore replace that file without
+ * merging anything.
  *
  * Pip is drawn by that script, not by React, so this component renders nothing.
  * When Pip cannot be shown (the script fails to load, takes too long, or throws)
@@ -42,13 +43,14 @@ type PipOptions = {
   hints?: boolean;
   idleTricks?: boolean;
   chatter?: boolean;
-  trickEvery?: [number, number];
   sleepAfter?: number;
 };
 
 type PipInstance = {
   /** The element Pip lives in. In corner mode the script appends it to <body>. */
   el: HTMLElement;
+  /** Types a line into Pip's speech bubble and keeps it up long enough to read. */
+  say: (text: string) => number;
   /** Plays a trick by name. Returns false when it could not start. */
   do: (name: string, options?: Record<string, unknown>) => boolean;
   /** Removes Pip together with every listener and timer it created. */
@@ -66,7 +68,7 @@ declare global {
 }
 
 // ---------------------------------------------------------------------------
-// Settings
+// Settings: loading and look
 // ---------------------------------------------------------------------------
 
 const SCRIPT_SRC = '/pip/pip-mascot.js';
@@ -111,13 +113,19 @@ const PIP_OPTIONS: PipOptions = {
   // The greeting is started further down, once Pip is really visible.
   greet: false,
   greeting: ['Hi! Need help?', 'Tap me to chat.'],
-  // A quiet Pip: no reactions to hovered buttons, no random chatter, no naps,
-  // and idle tricks less often than the script's default of every 7 to 13 s.
-  hints: false,
+  // The script's own idle tricks and chatter are off: both are scheduled here
+  // instead (see "what Pip does while it waits"), so they share one rhythm and
+  // the lines can depend on what the visitor is doing. No reactions to hovered
+  // buttons and no naps.
+  idleTricks: false,
   chatter: false,
+  hints: false,
   sleepAfter: 0,
-  trickEvery: [15000, 30000],
 };
+
+// ---------------------------------------------------------------------------
+// Settings: what Pip does while it waits
+// ---------------------------------------------------------------------------
 
 /** Set once Pip has greeted, so it greets once per browser session, not on every visit to the page. */
 const GREETED_KEY = 'pip_greeted';
@@ -128,6 +136,85 @@ const GREETED_KEY = 'pip_greeted';
  */
 const GREET_CLEAR_VIEW_MS = 2000;
 const GREET_CHECK_MS = 400;
+
+/** While Pip is in view it does one thing every 8 to 15 seconds: a trick or a spoken line. */
+const ACT_EVERY_MS: [number, number] = [8000, 15000];
+
+/** Pip plays one or two tricks between two spoken lines. */
+const TRICKS_BETWEEN_LINES: [number, number] = [1, 2];
+
+/** The tricks, weighted like the script's own idle mix. */
+const TRICKS: [name: string, weight: number][] = [
+  ['lookAround', 3],
+  ['hop', 2],
+  ['wink', 1.4],
+  ['think', 1.2],
+  ['love', 1],
+  ['dance', 1],
+  ['spin', 1],
+  ['wave', 0.6],
+];
+
+/** Pip does not speak while the visitor is typing: this long after the last key press. */
+const TYPING_PAUSE_MS = 5000;
+
+/** Invitations to open the chat, used in turn. The greeting already says "Tap me to chat." */
+const CHAT_LINES = [
+  'Need help? Tap me!',
+  'Got a question? Ask me.',
+  'Tap me to chat.',
+  'Stuck? I can help.',
+  'Order or payment question? Ask me.',
+];
+
+/** The same, for a visitor who has already opened the chat in this browser session. */
+const CHAT_LINES_AFTER_USE = ['Need anything else? Tap me.', 'More questions? I am right here.'];
+const CHAT_USED_KEY = 'pip_chat_used';
+
+/** Said shortly after the chat is closed, at most once in the repeat time. */
+const AFTER_CHAT_LINE = "I'm here if you need me again.";
+const AFTER_CHAT_DELAY_MS = 700;
+const AFTER_CHAT_REPEAT_MS = 120_000;
+
+/** Where the visitor is on the page, read at the moment Pip is about to speak. */
+type PageView = {
+  /** The visitor is still at the top of the page. */
+  nearTop: boolean;
+  /** At least half a screen of page is left below. */
+  moreBelow: boolean;
+  /** The end of the page is on screen. */
+  atEnd: boolean;
+  /** Whether an element matching the selector is on screen right now. */
+  shows: (selector: string) => boolean;
+};
+
+type Tip = {
+  text: string;
+  /** The line is only said while this holds. */
+  when: (page: PageView) => boolean;
+  /** How many times it may be said on one visit to the page. */
+  times: number;
+};
+
+/**
+ * Lines that depend on where the visitor is. The first one whose condition
+ * holds is used. A tip that names something on the page is tied to that thing
+ * being on screen, so Pip never points at something that is not there.
+ */
+const TIPS: Tip[] = [
+  { text: 'Scroll down to see more items.', when: (page) => page.nearTop && page.moreBelow, times: 2 },
+  { text: "That's the whole list. Need help? Tap me.", when: (page) => page.atEnd && !page.nearTop, times: 1 },
+  {
+    text: 'Looking for one item? Try the search box.',
+    when: (page) => page.shows('input[placeholder="Search products..."]'),
+    times: 1,
+  },
+  { text: 'You can filter the list by category.', when: (page) => page.shows('button[role="combobox"]'), times: 1 },
+  { text: 'Your orders are under the cart icon up top.', when: (page) => page.shows('a[href="/order"]'), times: 1 },
+];
+
+/** A tip that may be said twice waits this long before its second time. */
+const TIP_REPEAT_AFTER_MS = 90_000;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -170,20 +257,62 @@ function isUncovered(host: HTMLElement): boolean {
   return topmost !== null && host.contains(topmost);
 }
 
-function hasGreeted(): boolean {
+/** Whether an element matching the selector is drawn and has its middle inside the window. */
+function isOnScreen(selector: string): boolean {
+  for (const element of document.querySelectorAll(selector)) {
+    const box = element.getBoundingClientRect();
+    const middle = (box.top + box.bottom) / 2;
+    if (box.width > 0 && box.height > 0 && middle > 0 && middle < window.innerHeight) return true;
+  }
+  return false;
+}
+
+function readPage(): PageView {
+  const screen = window.innerHeight;
+  const below = document.documentElement.scrollHeight - (window.scrollY + screen);
+  return {
+    nearTop: window.scrollY < screen * 0.4,
+    moreBelow: below > screen * 0.5,
+    atEnd: below < screen * 0.25,
+    shows: isOnScreen,
+  };
+}
+
+/** Flags that last for the browser session. Without storage they are simply forgotten. */
+function hasFlag(key: string): boolean {
   try {
-    return window.sessionStorage.getItem(GREETED_KEY) === '1';
+    return window.sessionStorage.getItem(key) === '1';
   } catch {
     return false;
   }
 }
 
-function rememberGreeted(): void {
+function setFlag(key: string): void {
   try {
-    window.sessionStorage.setItem(GREETED_KEY, '1');
+    window.sessionStorage.setItem(key, '1');
   } catch {
-    // Storage is unavailable: Pip simply greets again next time.
+    // Storage is unavailable.
   }
+}
+
+function randomBetween([low, high]: [number, number]): number {
+  return low + Math.random() * (high - low);
+}
+
+/** A whole number from low to high, both included. */
+function randomWhole([low, high]: [number, number]): number {
+  return low + Math.floor(Math.random() * (high - low + 1));
+}
+
+/** A trick by weight, never the same one twice in a row. */
+function pickTrick(previous: string): string {
+  const pool = TRICKS.filter(([name]) => name !== previous);
+  let roll = Math.random() * pool.reduce((sum, [, weight]) => sum + weight, 0);
+  for (const [name, weight] of pool) {
+    roll -= weight;
+    if (roll <= 0) return name;
+  }
+  return pool[0][0];
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +320,10 @@ function rememberGreeted(): void {
 // ---------------------------------------------------------------------------
 
 export type PipLauncherHandle = {
-  /** Moves keyboard focus to Pip. Used to return focus when the chat closes. */
+  /**
+   * Called by the chat when it closes: moves keyboard focus back to Pip, and
+   * Pip says that it is still around.
+   */
   focus: () => void;
 };
 
@@ -207,6 +339,8 @@ const PipLauncher = forwardRef<PipLauncherHandle, PipLauncherProps>(function Pip
   ref
 ) {
   const buttonRef = useRef<HTMLElement | null>(null);
+  /** Set while Pip is on the page. */
+  const chatClosedRef = useRef<(() => void) | null>(null);
 
   // The latest callbacks, so the effect below runs only once per mount.
   const onOpenRef = useRef(onOpen);
@@ -219,7 +353,10 @@ const PipLauncher = forwardRef<PipLauncherHandle, PipLauncherProps>(function Pip
   useImperativeHandle(
     ref,
     () => ({
-      focus: () => buttonRef.current?.focus({ preventScroll: true }),
+      focus: () => {
+        buttonRef.current?.focus({ preventScroll: true });
+        chatClosedRef.current?.();
+      },
     }),
     []
   );
@@ -229,18 +366,142 @@ const PipLauncher = forwardRef<PipLauncherHandle, PipLauncherProps>(function Pip
     let stopped = false; // unmounted, or the caller was already told that Pip failed
     let loadTimer = 0;
     let greetTimer = 0;
+    let actTimer = 0;
+    let afterChatTimer = 0;
+
+    // What has happened so far on this visit to the page.
+    let greeted = hasFlag(GREETED_KEY);
+    let chatUsed = hasFlag(CHAT_USED_KEY);
+    let tricksSinceLine = 0;
+    let tricksBeforeLine = randomWhole(TRICKS_BETWEEN_LINES);
+    let lastTrick = '';
+    let lastLineWasTip = false; // the greeting counts as an invitation to chat
+    let chatLineIndex = 0;
+    let lastKeyAt = -Infinity;
+    let afterChatLineAt = -Infinity;
+    const tipUses = new Map<Tip, { count: number; at: number }>();
+
+    /** Under a dialog or in a background tab nobody is watching Pip. */
+    const inView = () => pip !== null && !document.hidden && isUncovered(pip.el);
+
+    const onKeyDown = () => {
+      lastKeyAt = performance.now();
+    };
+
+    // ---- speaking
+
+    const say = (text: string, wave: boolean) => {
+      if (!pip) return;
+      if (wave) pip.do('wave');
+      pip.say(text);
+      tricksSinceLine = 0;
+      tricksBeforeLine = randomWhole(TRICKS_BETWEEN_LINES);
+    };
+
+    /** A tip that fits the page right now if there is one and the last line was not a tip, else an invitation to chat. */
+    const nextLine = (): { text: string; wave: boolean } => {
+      const now = performance.now();
+      if (!lastLineWasTip) {
+        const page = readPage();
+        const tip = TIPS.find((candidate) => {
+          const used = tipUses.get(candidate);
+          if (used && (used.count >= candidate.times || now - used.at < TIP_REPEAT_AFTER_MS)) return false;
+          return candidate.when(page);
+        });
+        if (tip) {
+          tipUses.set(tip, { count: (tipUses.get(tip)?.count ?? 0) + 1, at: now });
+          lastLineWasTip = true;
+          return { text: tip.text, wave: false };
+        }
+      }
+      lastLineWasTip = false;
+      const lines = chatUsed ? CHAT_LINES_AFTER_USE : CHAT_LINES;
+      return { text: lines[chatLineIndex++ % lines.length], wave: true };
+    };
+
+    // ---- the rhythm: one thing every 8 to 15 seconds
+
+    const act = () => {
+      if (stopped || !pip) return;
+      if (inView()) {
+        const typing = performance.now() - lastKeyAt < TYPING_PAUSE_MS;
+        if (tricksSinceLine >= tricksBeforeLine && !typing) {
+          const line = nextLine();
+          say(line.text, line.wave);
+        } else {
+          lastTrick = pickTrick(lastTrick);
+          pip.do(lastTrick);
+          tricksSinceLine++;
+        }
+      }
+      scheduleAct();
+    };
+
+    const scheduleAct = () => {
+      window.clearTimeout(actTimer);
+      actTimer = window.setTimeout(act, randomBetween(ACT_EVERY_MS));
+    };
+
+    // ---- the greeting
+
+    // The page starts under a loading screen, and dialogs can follow it (the
+    // welcome dialog for guests, event popups). A greeting played underneath
+    // them would be missed, so it waits until nothing has covered Pip for a while.
+    let inViewSince: number | null = null;
+    const greetWhenInView = () => {
+      if (stopped || !pip) return;
+      const now = performance.now();
+      if (!inView()) inViewSince = null;
+      else if (inViewSince === null) inViewSince = now;
+
+      if (inViewSince !== null && now - inViewSince >= GREET_CLEAR_VIEW_MS) {
+        if (pip.do('hello')) setFlag(GREETED_KEY);
+        greeted = true;
+        scheduleAct();
+        return;
+      }
+      greetTimer = window.setTimeout(greetWhenInView, GREET_CHECK_MS);
+    };
+
+    // ---- the chat opening and closing
 
     const handleClick = () => {
-      // Whoever opens the chat no longer needs to be told what Pip is for.
-      window.clearTimeout(greetTimer);
-      rememberGreeted();
+      if (!greeted) {
+        // Whoever opens the chat no longer needs to be told what Pip is for.
+        window.clearTimeout(greetTimer);
+        setFlag(GREETED_KEY);
+        greeted = true;
+        scheduleAct();
+      }
+      chatUsed = true;
+      setFlag(CHAT_USED_KEY);
       onOpenRef.current();
     };
+
+    const handleChatClosed = () => {
+      if (stopped || !pip) return;
+      // A fresh 8 to 15 seconds, so no trick lands on top of the line below.
+      scheduleAct();
+      window.clearTimeout(afterChatTimer);
+      if (performance.now() - afterChatLineAt < AFTER_CHAT_REPEAT_MS) return;
+      afterChatTimer = window.setTimeout(() => {
+        if (stopped || !inView()) return;
+        afterChatLineAt = performance.now();
+        lastLineWasTip = false;
+        say(AFTER_CHAT_LINE, true);
+      }, AFTER_CHAT_DELAY_MS);
+    };
+
+    // ---- mounting and removing
 
     const removePip = () => {
       window.clearTimeout(loadTimer);
       window.clearTimeout(greetTimer);
+      window.clearTimeout(actTimer);
+      window.clearTimeout(afterChatTimer);
+      window.removeEventListener('keydown', onKeyDown);
       buttonRef.current = null;
+      chatClosedRef.current = null;
       if (!pip) return;
       pip.el.removeEventListener('click', handleClick);
       try {
@@ -257,23 +518,6 @@ const PipLauncher = forwardRef<PipLauncherHandle, PipLauncherProps>(function Pip
       removePip();
       console.warn('[PipLauncher] Pip is unavailable; showing the backup chat button.', reason);
       onFailRef.current();
-    };
-
-    // The page starts under a loading screen, and dialogs can follow it (the
-    // welcome dialog for guests, event popups). A greeting played underneath
-    // them would be missed, so it waits until nothing has covered Pip for a while.
-    let inViewSince: number | null = null;
-    const greetWhenInView = () => {
-      if (stopped || !pip) return;
-      const now = performance.now();
-      if (document.hidden || !isUncovered(pip.el)) inViewSince = null;
-      else if (inViewSince === null) inViewSince = now;
-
-      if (inViewSince !== null && now - inViewSince >= GREET_CLEAR_VIEW_MS) {
-        if (pip.do('hello')) rememberGreeted();
-        return;
-      }
-      greetTimer = window.setTimeout(greetWhenInView, GREET_CHECK_MS);
     };
 
     loadTimer = window.setTimeout(
@@ -299,8 +543,11 @@ const PipLauncher = forwardRef<PipLauncherHandle, PipLauncherProps>(function Pip
           button.setAttribute('aria-haspopup', 'dialog');
         }
         buttonRef.current = button;
+        chatClosedRef.current = handleChatClosed;
+        window.addEventListener('keydown', onKeyDown, { passive: true });
 
-        if (!hasGreeted()) greetTimer = window.setTimeout(greetWhenInView, GREET_CHECK_MS);
+        if (greeted) scheduleAct();
+        else greetTimer = window.setTimeout(greetWhenInView, GREET_CHECK_MS);
       })
       .catch(fail);
 
