@@ -155,6 +155,13 @@ const TRICKS: [name: string, weight: number][] = [
   ['wave', 0.6],
 ];
 
+/**
+ * Lines built into the script that do not suit this site, and what Pip says
+ * instead. The script stays an unedited copy, so a line is swapped at the
+ * moment Pip is about to say it, before any of it is shown.
+ */
+const REPLACED_LINES = new Map([['Hmm. Pizza or noodles?', 'Hmm…']]);
+
 /** Pip does not speak while the visitor is typing: this long after the last key press. */
 const TYPING_PAUSE_MS = 5000;
 
@@ -368,6 +375,7 @@ const PipLauncher = forwardRef<PipLauncherHandle, PipLauncherProps>(function Pip
     let greetTimer = 0;
     let actTimer = 0;
     let afterChatTimer = 0;
+    let lineFilter: MutationObserver | null = null;
 
     // What has happened so far on this visit to the page.
     let greeted = hasFlag(GREETED_KEY);
@@ -500,6 +508,8 @@ const PipLauncher = forwardRef<PipLauncherHandle, PipLauncherProps>(function Pip
       window.clearTimeout(actTimer);
       window.clearTimeout(afterChatTimer);
       window.removeEventListener('keydown', onKeyDown);
+      lineFilter?.disconnect();
+      lineFilter = null;
       buttonRef.current = null;
       chatClosedRef.current = null;
       if (!pip) return;
@@ -543,6 +553,20 @@ const PipLauncher = forwardRef<PipLauncherHandle, PipLauncherProps>(function Pip
           button.setAttribute('aria-haspopup', 'dialog');
         }
         buttonRef.current = button;
+
+        // The script puts a whole line into the bubble before it types the first
+        // letter: the typed part is empty and the rest is still hidden. A line
+        // from REPLACED_LINES is swapped right then, so none of it is ever shown.
+        const typed = host.querySelector('.pip-typed');
+        const rest = host.querySelector('.pip-rest');
+        if (typed && rest) {
+          lineFilter = new MutationObserver(() => {
+            const replacement = REPLACED_LINES.get(`${typed.textContent ?? ''}${rest.textContent ?? ''}`);
+            if (replacement !== undefined) pip?.say(replacement);
+          });
+          lineFilter.observe(rest, { childList: true, characterData: true, subtree: true });
+        }
+
         chatClosedRef.current = handleChatClosed;
         window.addEventListener('keydown', onKeyDown, { passive: true });
 
