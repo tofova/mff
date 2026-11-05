@@ -162,6 +162,8 @@ const TYPING_PAUSE_MS = 5000;
 // Everything Pip says is below. Keep each line short but clear: at most about
 // 23 characters, so it stays on one line of the speech bubble even on a phone
 // that is only 320 px wide.
+// Keep each line positive too: nothing that makes a new visitor think of
+// problems or delays on this site.
 
 /** Invitations to open the chat, used in turn. The greeting already says "Tap me to chat." */
 const CHAT_LINES = [
@@ -220,7 +222,6 @@ const FEATURE_TIPS: Tip[] = [
   { text: 'Try the search box.', when: (page) => page.shows('input[placeholder="Search products..."]') },
   { text: 'Filter by category.', when: (page) => page.shows('button[role="combobox"]') },
   { text: 'Tap the cart for orders.', when: (page) => page.shows('a[href="/order"]') },
-  { text: 'Problem? Try Support.', when: (page) => page.shows('a[href="/support"]') },
 ];
 
 /** The same tip is not said again for this long. */
