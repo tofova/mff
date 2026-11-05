@@ -103,10 +103,10 @@ const SITE_THEME: PipTheme = {
 const PIP_OPTIONS: PipOptions = {
   mode: 'corner',
   side: 'right',
-  // The frame, not the visible size. At 84 the character itself is about
-  // 62 x 65 px: about the size of the 64 px round button Pip replaced, and
-  // still narrower than it. From 88 up Pip would be wider than that button.
-  size: 84,
+  // The frame, not the visible size. At 86 the character itself is about
+  // 63 x 67 px: just narrower than the 64 px round button Pip replaced, and
+  // 3 px taller. From 88 up Pip would be wider than that button.
+  size: 86,
   theme: SITE_THEME,
   // The greeting is started further down, once Pip is really visible.
   greet: false,
