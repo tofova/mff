@@ -20,6 +20,7 @@ import { askQuestion, getChatHistory } from '@/app/actions';
 import { ScrollArea } from './ui/scroll-area';
 import { type AiLog } from '@/lib/definitions';
 import { handleNotificationCardClick } from '@/lib/same-tab-notification-links';
+import PipLauncher, { type PipLauncherHandle } from '@/components/pip-launcher';
 import Image from 'next/image';
 import {
   Dialog,
@@ -91,6 +92,10 @@ export default function FaqChatbot() {
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [media, setMedia] = useState<{ uri: string; type: 'image' } | null>(null);
   const [zoomedMedia, setZoomedMedia] = useState<{ uri: string; type: 'image' } | null>(null);
+  // The chat is opened by Pip, the mascot. This turns true only when Pip cannot
+  // be shown, and the plain backup button takes its place.
+  const [pipFailed, setPipFailed] = useState(false);
+  const pipLauncherRef = useRef<PipLauncherHandle>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -207,16 +212,26 @@ export default function FaqChatbot() {
   return (
     <>
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
-      <SheetTrigger asChild>
-        <Button
-          size="lg"
-          className="fixed bottom-6 right-6 rounded-full w-16 h-16 shadow-lg bg-primary/30 backdrop-blur-sm hover:bg-primary/40 transition-transform duration-300 hover:scale-110 z-20 p-0"
-          aria-label="Open FAQ Chatbot"
-        >
-          <Image src="/img/robo.gif" alt="Chatbot" layout="fill" className="object-cover"/>
-        </Button>
-      </SheetTrigger>
-      <SheetContent className="flex flex-col">
+      {pipFailed ? (
+        // Backup launcher, shown only when Pip could not be loaded.
+        <SheetTrigger asChild>
+          <Button
+            size="lg"
+            className="fixed bottom-6 right-6 rounded-full w-16 h-16 shadow-lg transition-transform duration-300 hover:scale-110 z-20 p-0 [&_svg]:size-8"
+            aria-label="Open FAQ Chatbot"
+          >
+            <Bot />
+          </Button>
+        </SheetTrigger>
+      ) : (
+        <PipLauncher
+          ref={pipLauncherRef}
+          onOpen={() => setIsOpen(true)}
+          onFail={() => setPipFailed(true)}
+        />
+      )}
+      {/* On close, focus goes back to Pip. With the backup button the ref is empty and Radix returns focus to that button itself. */}
+      <SheetContent className="flex flex-col" onCloseAutoFocus={() => pipLauncherRef.current?.focus()}>
         <SheetHeader className="mb-4">
           <SheetTitle className="font-headline text-xl flex items-center gap-2">
             <Sparkles className="text-primary w-6 h-6" />
