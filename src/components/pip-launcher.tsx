@@ -4,11 +4,12 @@
  * Pip, the 2D mascot from the "Pip Website Mascot" artifact, as the launcher of
  * the home page's chat assistant.
  *
- * `public/pip/pip-mascot.js` is an unedited copy of the artifact's 2D script.
- * Everything specific to this site is applied from here, on the outside:
- * colours, size, layering, what a click does, and what Pip does and says while
- * it waits. A newer copy of the script can therefore replace that file without
- * merging anything.
+ * `public/pip/pip-mascot.js` is this site's own copy of the artifact's 2D
+ * script. The artifact itself is never changed, because it is reused on other
+ * sites; the copy may be edited where this site needs it, and every such edit
+ * is listed at the top of that file. Most of what is specific to this site is
+ * applied from here, on the outside: colours, size, layering, what a click
+ * does, and what Pip does and says while it waits.
  *
  * Pip is drawn by that script, not by React, so this component renders nothing.
  * When Pip cannot be shown (the script fails to load, takes too long, or throws)
@@ -155,15 +156,12 @@ const TRICKS: [name: string, weight: number][] = [
   ['wave', 0.6],
 ];
 
-/**
- * Lines built into the script that do not suit this site, and what Pip says
- * instead. The script stays an unedited copy, so a line is swapped at the
- * moment Pip is about to say it, before any of it is shown.
- */
-const REPLACED_LINES = new Map([['Hmm. Pizza or noodles?', 'Hmm…']]);
-
 /** Pip does not speak while the visitor is typing: this long after the last key press. */
 const TYPING_PAUSE_MS = 5000;
+
+// Everything Pip says is below. Keep each line short but clear: at most about
+// 23 characters, so it stays on one line of the speech bubble even on a phone
+// that is only 320 px wide.
 
 /** Invitations to open the chat, used in turn. The greeting already says "Tap me to chat." */
 const CHAT_LINES = [
@@ -171,15 +169,16 @@ const CHAT_LINES = [
   'Got a question? Ask me.',
   'Tap me to chat.',
   'Stuck? I can help.',
-  'Order or payment question? Ask me.',
+  'Payment help? Ask me.',
+  'Order help? Ask me.',
 ];
 
 /** The same, for a visitor who has already opened the chat in this browser session. */
-const CHAT_LINES_AFTER_USE = ['Need anything else? Tap me.', 'More questions? I am right here.'];
+const CHAT_LINES_AFTER_USE = ['Anything else? Tap me.', 'More questions? Tap me.'];
 const CHAT_USED_KEY = 'pip_chat_used';
 
 /** Said shortly after the chat is closed, at most once in the repeat time. */
-const AFTER_CHAT_LINE = "I'm here if you need me again.";
+const AFTER_CHAT_LINE = "I'm here if you need me.";
 const AFTER_CHAT_DELAY_MS = 700;
 const AFTER_CHAT_REPEAT_MS = 120_000;
 
@@ -199,29 +198,33 @@ type Tip = {
   text: string;
   /** The line is only said while this holds. */
   when: (page: PageView) => boolean;
-  /** How many times it may be said on one visit to the page. */
-  times: number;
 };
 
-/**
- * Lines that depend on where the visitor is. The first one whose condition
- * holds is used. A tip that names something on the page is tied to that thing
- * being on screen, so Pip never points at something that is not there.
- */
-const TIPS: Tip[] = [
-  { text: 'Scroll down to see more items.', when: (page) => page.nearTop && page.moreBelow, times: 2 },
-  { text: "That's the whole list. Need help? Tap me.", when: (page) => page.atEnd && !page.nearTop, times: 1 },
-  {
-    text: 'Looking for one item? Try the search box.',
-    when: (page) => page.shows('input[placeholder="Search products..."]'),
-    times: 1,
-  },
-  { text: 'You can filter the list by category.', when: (page) => page.shows('button[role="combobox"]'), times: 1 },
-  { text: 'Your orders are under the cart icon up top.', when: (page) => page.shows('a[href="/order"]'), times: 1 },
+/** Tips about where the visitor is on the page. These are tried first. */
+const PLACE_TIPS: Tip[] = [
+  { text: 'Scroll for more items.', when: (page) => page.nearTop && page.moreBelow },
+  { text: "That's all! Need help?", when: (page) => page.atEnd && !page.nearTop },
 ];
 
-/** A tip that may be said twice waits this long before its second time. */
-const TIP_REPEAT_AFTER_MS = 90_000;
+/** The "Watch Ad" and coin balance cards near the top of the home page. */
+const COIN_CARDS = 'a[href="/watch-ad"]';
+
+/**
+ * Tips about things on the page, tried in a new random order on every visit.
+ * Each is tied to its thing being on screen, so Pip never points at something
+ * that is not there.
+ */
+const FEATURE_TIPS: Tip[] = [
+  { text: 'Watch ads to earn coins.', when: (page) => page.shows(COIN_CARDS) },
+  { text: 'Use coins to pay less.', when: (page) => page.shows(COIN_CARDS) },
+  { text: 'Try the search box.', when: (page) => page.shows('input[placeholder="Search products..."]') },
+  { text: 'Filter by category.', when: (page) => page.shows('button[role="combobox"]') },
+  { text: 'Tap the cart for orders.', when: (page) => page.shows('a[href="/order"]') },
+  { text: 'Problem? Try Support.', when: (page) => page.shows('a[href="/support"]') },
+];
+
+/** The same tip is not said again for this long. */
+const TIP_REPEAT_AFTER_MS = 180_000;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -311,6 +314,16 @@ function randomWhole([low, high]: [number, number]): number {
   return low + Math.floor(Math.random() * (high - low + 1));
 }
 
+/** A copy of the list in random order. */
+function shuffled<T>(items: T[]): T[] {
+  const copy = items.slice();
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 /** A trick by weight, never the same one twice in a row. */
 function pickTrick(previous: string): string {
   const pool = TRICKS.filter(([name]) => name !== previous);
@@ -375,7 +388,6 @@ const PipLauncher = forwardRef<PipLauncherHandle, PipLauncherProps>(function Pip
     let greetTimer = 0;
     let actTimer = 0;
     let afterChatTimer = 0;
-    let lineFilter: MutationObserver | null = null;
 
     // What has happened so far on this visit to the page.
     let greeted = hasFlag(GREETED_KEY);
@@ -387,7 +399,8 @@ const PipLauncher = forwardRef<PipLauncherHandle, PipLauncherProps>(function Pip
     let chatLineIndex = 0;
     let lastKeyAt = -Infinity;
     let afterChatLineAt = -Infinity;
-    const tipUses = new Map<Tip, { count: number; at: number }>();
+    const tips = [...PLACE_TIPS, ...shuffled(FEATURE_TIPS)];
+    const tipSaidAt = new Map<Tip, number>();
 
     /** Under a dialog or in a background tab nobody is watching Pip. */
     const inView = () => pip !== null && !document.hidden && isUncovered(pip.el);
@@ -411,13 +424,12 @@ const PipLauncher = forwardRef<PipLauncherHandle, PipLauncherProps>(function Pip
       const now = performance.now();
       if (!lastLineWasTip) {
         const page = readPage();
-        const tip = TIPS.find((candidate) => {
-          const used = tipUses.get(candidate);
-          if (used && (used.count >= candidate.times || now - used.at < TIP_REPEAT_AFTER_MS)) return false;
-          return candidate.when(page);
-        });
+        const tip = tips.find(
+          (candidate) =>
+            now - (tipSaidAt.get(candidate) ?? -Infinity) >= TIP_REPEAT_AFTER_MS && candidate.when(page)
+        );
         if (tip) {
-          tipUses.set(tip, { count: (tipUses.get(tip)?.count ?? 0) + 1, at: now });
+          tipSaidAt.set(tip, now);
           lastLineWasTip = true;
           return { text: tip.text, wave: false };
         }
@@ -508,8 +520,6 @@ const PipLauncher = forwardRef<PipLauncherHandle, PipLauncherProps>(function Pip
       window.clearTimeout(actTimer);
       window.clearTimeout(afterChatTimer);
       window.removeEventListener('keydown', onKeyDown);
-      lineFilter?.disconnect();
-      lineFilter = null;
       buttonRef.current = null;
       chatClosedRef.current = null;
       if (!pip) return;
@@ -553,20 +563,6 @@ const PipLauncher = forwardRef<PipLauncherHandle, PipLauncherProps>(function Pip
           button.setAttribute('aria-haspopup', 'dialog');
         }
         buttonRef.current = button;
-
-        // The script puts a whole line into the bubble before it types the first
-        // letter: the typed part is empty and the rest is still hidden. A line
-        // from REPLACED_LINES is swapped right then, so none of it is ever shown.
-        const typed = host.querySelector('.pip-typed');
-        const rest = host.querySelector('.pip-rest');
-        if (typed && rest) {
-          lineFilter = new MutationObserver(() => {
-            const replacement = REPLACED_LINES.get(`${typed.textContent ?? ''}${rest.textContent ?? ''}`);
-            if (replacement !== undefined) pip?.say(replacement);
-          });
-          lineFilter.observe(rest, { childList: true, characterData: true, subtree: true });
-        }
-
         chatClosedRef.current = handleChatClosed;
         window.addEventListener('keydown', onKeyDown, { passive: true });
 

@@ -11,6 +11,11 @@
  *
  * Give a link or button a line to say:   <a href="/pricing" data-pip-hint="Psst, there's a free plan!">Pricing</a>
  * Stop Pip reacting inside an area:      <nav data-pip-ignore>…</nav>
+ *
+ * This file is this site's own copy, taken from the "Pip Website Mascot"
+ * artifact (v1.0.0). The artifact is never changed; this copy may be.
+ * Changed here so far:
+ *   - LINES.thoughts: removed the line "Hmm. Pizza or noodles?"
  */
 (function () {
   'use strict';
@@ -52,7 +57,7 @@
   };
 
   const LINES = {
-    thoughts: ['Hmm…', 'Hmm… what was I doing?', 'Thinking very hard…', 'Hmm. Pizza or noodles?'],
+    thoughts: ['Hmm…', 'Hmm… what was I doing?', 'Thinking very hard…'],
     giggles: ['Hehe, that tickles!', 'Boop!', 'Hee hee!', 'Again! Again!'],
     dizzy: ['Whoa… the room is spinning.', 'Easy there… @_@', 'Wheee… oof.'],
     wake: ['Oh! Hi again!', "I wasn't sleeping. Promise.", 'Huh? Oh, hello!'],
