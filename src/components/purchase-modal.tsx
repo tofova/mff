@@ -21,6 +21,8 @@ import QRCode from 'react-qr-code';
 import { createPaymentLock, releasePaymentLock, checkPaymentStatus, quoteUpiPrice } from './purchase-actions';
 import { sanitizeUpiNoteText } from '@/lib/pay-code';
 import { getActiveUpiId } from '@/lib/get-active-upi';
+import { identifyUser, productProperties, track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 // The product passed to this modal has its _id serialized to a string
 interface ProductWithStringId extends Omit<Product, '_id'> {
@@ -62,8 +64,18 @@ export default function PurchaseModal({ product, user: initialUser, onClose }: P
   const { triggerRefresh } = useRefresh();
   const pollingInterval = useRef<NodeJS.Timeout | null>(null);
 
+  // PostHog: the current step, readable from callbacks without changing their dependencies.
+  const stepRef = useRef<ModalStep>(step);
+  stepRef.current = step;
+  const analyticsProps = (extra?: Record<string, unknown>) =>
+    productProperties(product, { final_price: finalPrice, convenience_fee: convenienceFee, ...extra });
+
   const handleClose = useCallback(() => {
     setIsOpen(false);
+    // PostHog: where in the flow the buyer closed the modal (the success step closes by itself).
+    if (stepRef.current !== 'success') {
+      track(AnalyticsEvents.checkoutClosed, productProperties(product, { last_step: stepRef.current, had_payment_lock: !!paymentLockId }));
+    }
     if (pollingInterval.current) {
         clearInterval(pollingInterval.current);
     }
@@ -87,6 +99,7 @@ export default function PurchaseModal({ product, user: initialUser, onClose }: P
   // Effect to handle session expiration
   useEffect(() => {
     if (qrCountdown <= 0 && step === 'qrPayment') {
+      track(AnalyticsEvents.checkoutQrExpired, productProperties(product, { final_price: finalPrice }));
       toast({
         variant: 'destructive',
         title: 'Session Expired',
@@ -142,6 +155,7 @@ export default function PurchaseModal({ product, user: initialUser, onClose }: P
                     }
                     setStep('details');
                 } else {
+                    track(AnalyticsEvents.checkoutNotEligible, productProperties(product, { reason: result.message }));
                     toast({
                         variant: 'destructive',
                         title: 'Not Eligible',
@@ -173,9 +187,13 @@ export default function PurchaseModal({ product, user: initialUser, onClose }: P
     const result = await registerAction(gamingId);
     if (result.success && result.user) {
         toast({ title: 'Success', description: result.message });
+        // PostHog: link this browser to the Gaming ID and record the sign-in before the reload.
+        identifyUser(result.user);
+        track(AnalyticsEvents.registrationCompleted, { source: 'purchase_modal' }, { instant: true });
         window.location.reload();
     } else {
         toast({ variant: 'destructive', title: 'Error', description: result.message });
+        track(AnalyticsEvents.registrationFailed, { source: 'purchase_modal', reason: result.message });
         setIsLoading(false);
     }
   };
@@ -201,7 +219,9 @@ export default function PurchaseModal({ product, user: initialUser, onClose }: P
         setStep('qrPayment');
         setIsQrLoading(true); // show loader for QR
         setTimeout(() => setIsQrLoading(false), 1000);
+        track(AnalyticsEvents.checkoutUpiStarted, productProperties(product, { final_price: result.amount, convenience_fee: result.fee }));
     } else {
+        track(AnalyticsEvents.checkoutUpiFailed, productProperties(product, { reason: result.message || 'payment_busy' }));
         toast({
             variant: 'destructive',
             title: 'Payment Busy',
@@ -226,7 +246,9 @@ export default function PurchaseModal({ product, user: initialUser, onClose }: P
     if (result.success) {
         setStep('processing');
         triggerRefresh();
+        track(AnalyticsEvents.checkoutRedeemSubmitted, productProperties(product, { final_price: finalPrice }));
     } else {
+        track(AnalyticsEvents.checkoutRedeemFailed, productProperties(product, { reason: result.message }));
         toast({ variant: 'destructive', title: 'Error', description: result.message });
     }
     setIsLoading(false);
@@ -241,6 +263,13 @@ export default function PurchaseModal({ product, user: initialUser, onClose }: P
     }
     return () => clearTimeout(successTimer);
   }, [step, handleClose]);
+
+  // PostHog: one event per checkout step (verifying, register, details, qrPayment, processing, success).
+  useEffect(() => {
+    track(AnalyticsEvents.checkoutStepViewed, analyticsProps({ step }));
+    if (step === 'success') track(AnalyticsEvents.checkoutSuccessSeen, analyticsProps({ payment_method: 'UPI' }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   const renderContent = () => {
     switch (step) {
