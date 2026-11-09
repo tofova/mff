@@ -27,6 +27,8 @@ import MetaPixelPurchaseTracker from '@/components/meta-pixel-purchase-tracker';
 import BrowserRedirect from '@/components/browser-redirect';
 import PresenceBeacon from '@/components/presence/presence-beacon';
 import { GOOGLE_ADS_ID } from '@/lib/google-ads';
+import { identifyUser, track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 
 const FCM_TOKEN_KEY = 'fcm_token';
@@ -120,6 +122,7 @@ export default function RootLayout({
             const swRegistration = await navigator.serviceWorker.ready;
             
             const permission = await Notification.requestPermission();
+            track(AnalyticsEvents.pushPermissionResult, { permission });
             
             if (permission === 'granted') {
               const currentToken = await getToken(messaging, { 
@@ -180,6 +183,13 @@ export default function RootLayout({
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // PostHog: tie this browser's events and replays to the registered Gaming ID.
+  // Keyed on the ID only, so the periodic user refreshes do not re-send it.
+  useEffect(() => {
+    if (user?.gamingId) identifyUser(user);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.gamingId]);
 
   // Quietly keep the notification bell in sync every 15s so the unread count and
   // the list reflect server changes WITHOUT the user having to close/re-open it.
