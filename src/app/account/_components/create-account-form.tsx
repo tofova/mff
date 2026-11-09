@@ -12,6 +12,8 @@ import { AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { PasswordInput } from './password-input';
+import { track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -34,12 +36,14 @@ export default function CreateAccountForm() {
         title: 'Error',
         description: state.message,
       });
+      track(AnalyticsEvents.accountCreateFailed, { reason: state.message });
     }
     if (state.message && state.success) {
         toast({
           title: 'Success',
           description: state.message,
         });
+        track(AnalyticsEvents.accountCreated);
       }
   }, [state, toast]);
 

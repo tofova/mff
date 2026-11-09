@@ -15,6 +15,8 @@ import { cn } from '@/lib/utils';
 import type { SliderImage } from '@/lib/definitions';
 import { Skeleton } from './ui/skeleton';
 import SliderMedia from './slider-media';
+import { track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 interface ImageSliderProps {
     sliderImages: SliderImage[];
@@ -45,7 +47,9 @@ export default function ImageSlider({ sliderImages }: ImageSliderProps) {
 
   const scrollTo = useCallback((index: number) => {
     api?.scrollTo(index);
-  }, [api]);
+    // PostHog: only visitor-chosen slides (autoplay changes are not interesting).
+    track(AnalyticsEvents.sliderSlideViewed, { index, total: sliderImages.length, source: 'dot' });
+  }, [api, sliderImages.length]);
   
   if (isLoading) {
       return (

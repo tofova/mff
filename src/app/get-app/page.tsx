@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { APK_DOWNLOAD_URL } from '@/lib/app-download';
+import { track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 // Landing page for the app download. Its whole job is to be a page of THIS site
 // that the browser loads before the APK: by the time it renders, the middleware
@@ -15,6 +17,7 @@ export default function GetAppPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setStarted(true);
+      track(AnalyticsEvents.appDownloadStarted, { trigger: 'auto' }, { instant: true });
       window.location.href = APK_DOWNLOAD_URL;
     }, 1200);
     return () => clearTimeout(timer);
@@ -27,7 +30,7 @@ export default function GetAppPage() {
       <p className="text-muted-foreground max-w-sm">
         If nothing happens in a few seconds, tap the button below. After installing, open the app to continue.
       </p>
-      <a href={APK_DOWNLOAD_URL} download>
+      <a href={APK_DOWNLOAD_URL} download onClick={() => track(AnalyticsEvents.appDownloadStarted, { trigger: 'button' }, { instant: true })}>
         <Button size="lg">
           <Download className="mr-2" /> Download App
         </Button>

@@ -5,6 +5,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import type { Notification } from '@/lib/definitions';
 import SmartImage from '@/components/smart-image';
 import { isVideoUrl } from '@/lib/media-urls';
+import { useEffect } from 'react';
+import { track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 interface PopupNotificationProps {
   notification: Notification;
@@ -57,6 +60,17 @@ const ClickableMessage = ({ message }: { message: string }) => {
 
 
 export default function PopupNotification({ notification, onClose }: PopupNotificationProps) {
+  // PostHog: shown on mount, closed on unmount (the layout unmounts it when it is dismissed).
+  const notificationId = String(notification._id);
+  useEffect(() => {
+    const shownAt = Date.now();
+    track(AnalyticsEvents.popupNotificationShown, { notification_id: notificationId, has_media: !!notification.imageUrl });
+    return () => {
+      track(AnalyticsEvents.popupNotificationClosed, { notification_id: notificationId, open_ms: Date.now() - shownAt });
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notificationId]);
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">

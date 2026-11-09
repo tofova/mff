@@ -54,6 +54,8 @@ import {
 } from './support-attachments';
 import type { SupportTicket, SupportMessage } from '@/lib/support-definitions';
 import GamingIdModal from '@/components/gaming-id-modal';
+import { track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 import { makeNotificationLinksOpenInSameTab, handleNotificationCardClick } from '@/lib/same-tab-notification-links';
 
 // A photo staged for sending: the real File (uploaded to GridFS in chunks) plus
@@ -475,6 +477,7 @@ export default function SupportClient({ initialUser, initialTickets }: SupportCl
     if (fresh) setActiveTicket(fresh);
     refreshList();
     toast({ title: 'Callback requested', description: res.message });
+    track(AnalyticsEvents.supportCallbackRequested, { ticket_id: ticketId });
   };
 
   const handleCreate = async () => {
@@ -493,6 +496,11 @@ export default function SupportClient({ initialUser, initialTickets }: SupportCl
     }
 
     const ticketId = result.ticketId;
+    track(AnalyticsEvents.supportTicketCreated, {
+      ticket_id: ticketId,
+      message_length: newMessage.trim().length,
+      has_attachments: newAttachments.length > 0,
+    });
 
     // Upload any attachments (photos/videos/files) via GridFS, then post them.
     const toSend = [...newAttachments];
@@ -599,6 +607,7 @@ export default function SupportClient({ initialUser, initialTickets }: SupportCl
 
     setIsSending(true);
     sendingRef.current = true;
+    track(AnalyticsEvents.supportMessageSent, { ticket_id: ticketId, has_text: text.length > 0, images_count: imagesToSend.length });
 
     // --- Send photos (if any) — uploaded to GridFS in chunks ---
     if (imagesToSend.length > 0) {
@@ -1164,7 +1173,7 @@ export default function SupportClient({ initialUser, initialTickets }: SupportCl
             <h1 className="text-2xl font-bold font-headline">Garena Support</h1>
             <Image src="/img/bluetick.gif" alt="Verified" width={20} height={20} className="h-5 w-5" />
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground ph-mask">
             {initialUser
               ? `Logged in as ${initialUser.visualGamingId || initialUser.gamingId}`
               : 'Create a report and chat with our team'}

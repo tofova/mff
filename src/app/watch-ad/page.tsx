@@ -12,6 +12,8 @@ import type { CustomAd, User } from '@/lib/definitions';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import GamingIdModal from '@/components/gaming-id-modal';
+import { track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 
 export default function WatchAdPage() {
@@ -45,8 +47,15 @@ export default function WatchAdPage() {
       }
       setUser(userData);
 
+      if (!adData) track(AnalyticsEvents.adNoneAvailable);
       if (adData) {
         setAd(adData);
+        track(AnalyticsEvents.adWatchStarted, {
+          ad_id: String(adData._id),
+          cta_link: adData.ctaLink,
+          duration_sec: adData.totalDuration,
+          reward_at_sec: adData.rewardTime || adData.totalDuration,
+        });
         // Server-issued single-use token; the reward can only be claimed after the
         // server-side reward time has passed.
         const session = await startAdSession(String(adData._id));
@@ -110,6 +119,7 @@ export default function WatchAdPage() {
       if (cancelled) return;
       if (result.success) {
         toast({ title: 'Success!', description: result.message || "You've earned 5 coins!" });
+        track(AnalyticsEvents.adRewardGranted, { ad_id: ad ? String(ad._id) : null, attempt });
       } else if (result.retryAfterMs && attempt < 3) {
         // Server clock says the reward time has not quite passed yet; try again shortly.
         setTimeout(() => claim(attempt + 1), result.retryAfterMs);
@@ -129,11 +139,13 @@ export default function WatchAdPage() {
 
   const handleCtaClick = useCallback(() => {
     if (ad) {
+      track(AnalyticsEvents.adCtaClicked, { ad_id: String(ad._id), cta_link: ad.ctaLink });
       window.open(ad.ctaLink, '_blank');
     }
   }, [ad]);
   
   const handleSkip = () => {
+    track(AnalyticsEvents.adSkipped, { ad_id: ad ? String(ad._id) : null, elapsed_sec: timeElapsed, reward_granted: isRewardGranted });
     router.push('/');
   }
 

@@ -29,6 +29,8 @@ import {
   DialogTitle,
   DialogClose,
 } from '@/components/ui/dialog';
+import { track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -138,6 +140,11 @@ export default function FaqChatbot() {
     }
   }, [isHistoryLoading, scrollToBottom]);
 
+  // PostHog: how often the help chat is opened.
+  useEffect(() => {
+    if (isOpen) track(AnalyticsEvents.faqChatOpened);
+  }, [isOpen]);
+
   useEffect(() => {
     if (messages.length > 0) {
       scrollToBottom();
@@ -177,6 +184,12 @@ export default function FaqChatbot() {
     if ((!question && !media) || isLoading) return;
 
     setIsLoading(true);
+    // PostHog: what people ask the help chat (first 200 characters).
+    track(AnalyticsEvents.faqQuestionSubmitted, {
+      question: (question || '').slice(0, 200),
+      question_length: question?.length ?? 0,
+      has_image: !!media,
+    });
     const userMessage: Message = { 
       role: 'user', 
       content: question || 'Please analyze this image.', 

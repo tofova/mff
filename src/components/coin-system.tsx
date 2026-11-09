@@ -19,6 +19,8 @@ import { PasswordInput } from '@/app/account/_components/password-input';
 import { ScrollArea } from './ui/scroll-area';
 import { useRefresh } from '@/context/RefreshContext';
 import Radar from './layout/radar';
+import { track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 
 interface CoinSystemProps {
@@ -143,6 +145,7 @@ export default function CoinSystem({ user: initialUser }: CoinSystemProps) {
     if (!currentUser) {
         e.preventDefault();
         setIsRegisterModalOpen(true);
+        track(AnalyticsEvents.coinsUnregisteredClick);
     }
   };
 
@@ -154,6 +157,7 @@ export default function CoinSystem({ user: initialUser }: CoinSystemProps) {
   };
   
   const handleShowHistory = () => {
+    track(AnalyticsEvents.coinsHistoryOpened);
     startHistoryTransition(async () => {
         const history = await getGiftHistoryForUser();
         setHistoryItems(history);
@@ -274,7 +278,7 @@ export default function CoinSystem({ user: initialUser }: CoinSystemProps) {
                         return (
                             <div key={item._id.toString()} className="flex justify-between items-center text-sm p-3 rounded-md bg-muted/50">
                                 <div>
-                                    <p className="font-medium font-sans">Sent to: <span className="font-mono">{item.gamingId}</span></p>
+                                    <p className="font-medium font-sans">Sent to: <span className="font-mono ph-mask">{item.gamingId}</span></p>
                                     <p className="text-xs text-muted-foreground">
                                         <GiftHistoryFormattedDate dateString={item.createdAt as unknown as string} />
                                     </p>

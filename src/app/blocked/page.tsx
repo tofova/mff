@@ -5,13 +5,21 @@ import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShieldBan, Mail, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
+import { track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 function BlockedContent() {
   const searchParams = useSearchParams();
   const reason = searchParams.get('reason');
 
+  // PostHog: how many visitors land on the access-denied screen, and why.
+  useEffect(() => {
+    track(AnalyticsEvents.blockedPageShown, { reason });
+  }, [reason]);
+
   const handleReviewRequest = () => {
+    track(AnalyticsEvents.blockedReviewRequested, { reason });
     const recipient = 'garenaffmaxstore@gmail.com';
     const subject = 'Access Denied - Review Request';
     const body = `
