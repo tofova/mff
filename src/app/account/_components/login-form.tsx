@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label';
 import { CardContent, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { PasswordInput } from './password-input';
+import { track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -31,12 +33,14 @@ export default function LoginForm() {
         title: 'Error',
         description: state.message,
       });
+      track(AnalyticsEvents.loginFailed, { reason: state.message });
     }
      if (state.message && state.success) {
       toast({
         title: 'Success',
         description: state.message,
       });
+      track(AnalyticsEvents.loginSucceeded);
     }
   }, [state, toast]);
 

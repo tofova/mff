@@ -24,6 +24,8 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import GamingIdModal from '@/components/gaming-id-modal';
 import RefundStatusFloating from '@/components/refund-status-floating';
+import { track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 export default function RefundRequestPage() {
   const [transactionId, setTransactionId] = useState('');
@@ -99,6 +101,7 @@ ${message}`;
 
     if (!result.success || !result.ticketId) {
       setIsSubmitting(false);
+      track(AnalyticsEvents.refundRequestFailed, { reason: result.message });
       toast({
         variant: 'destructive',
         title: 'Could not submit request',
@@ -106,6 +109,12 @@ ${message}`;
       });
       return;
     }
+
+    track(AnalyticsEvents.refundRequestSubmitted, {
+      ticket_id: result.ticketId,
+      has_attachments: attachments.length > 0,
+      has_transaction_id: transactionId.trim().length > 0,
+    });
 
     // Upload any attachments (photos/videos/files) via GridFS, then post them.
     const toSend = [...attachments];

@@ -140,7 +140,7 @@ export default function OrderPage() {
                  <CardHeader className="flex flex-row items-start justify-between gap-4 p-4">
                    <div className="flex-grow">
                       <CardTitle className="text-lg leading-tight">{order.productName}</CardTitle>
-                      <CardDescription className="text-sm mt-1">Gaming ID: {user.visualGamingId || order.gamingId}</CardDescription>
+                      <CardDescription className="text-sm mt-1 ph-mask">Gaming ID: {user.visualGamingId || order.gamingId}</CardDescription>
                    </div>
                    <Badge
                       variant={

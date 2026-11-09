@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import ProductCard from '@/components/product-card';
 import type { Product, User, Order, UserProductControl } from '@/lib/definitions';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,8 @@ import { type ObjectId } from 'mongodb';
 import { getProducts, getUserData, getOrdersForUser, getUserProductControls } from '@/app/actions';
 import { useRefresh } from '@/context/RefreshContext';
 import SecondCardWrapper from './second-card-wrapper';
+import { track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 interface ProductListProps {
     initialProducts: (Product & { _id: string | ObjectId })[];
@@ -116,6 +118,18 @@ export default function ProductList({ initialProducts, initialUser, initialOrder
     return currentProducts;
   }, [products, searchTerm, selectedCategory, user, controls]);
 
+  // PostHog: what people search for, sent once they stop typing for 0.8 s.
+  const resultsCountRef = useRef(0);
+  resultsCountRef.current = filteredAndSortedProducts.length;
+  useEffect(() => {
+    const term = searchTerm.trim();
+    if (term.length < 2) return;
+    const timer = setTimeout(() => {
+      track(AnalyticsEvents.productSearched, { term, term_length: term.length, results_count: resultsCountRef.current });
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   return (
     <section className="w-full py-6 md:py-10 lg:py-12 bg-background">
       <div className="container mx-auto px-4 md:px-6">
@@ -134,7 +148,7 @@ export default function ProductList({ initialProducts, initialUser, initialOrder
                     className="pl-10 w-full"
                 />
             </div>
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <Select value={selectedCategory} onValueChange={(value) => { setSelectedCategory(value); track(AnalyticsEvents.categorySelected, { category: value }); }}>
                 <SelectTrigger className="w-[100px] md:w-[140px] flex-shrink-0">
                     <SelectValue placeholder="Select Category" />
                 </SelectTrigger>
@@ -160,6 +174,7 @@ export default function ProductList({ initialProducts, initialUser, initialOrder
                       user={user}
                       orders={productOrders}
                       control={control}
+                      position={index}
                     />
                 </SecondCardWrapper>
             )

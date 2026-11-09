@@ -4,6 +4,8 @@
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { buildChromeIntentUrl } from '@/lib/in-app-browser';
+import { track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 const SESSION_STORAGE_KEY = 'hasCheckedBrowser';
 
@@ -36,6 +38,9 @@ export default function BrowserRedirect() {
       // The intent URL is specific to Android and tells it to open the URL in the Chrome package
       // (with a fallback to the plain URL when Chrome is not installed).
       const intentUrl = buildChromeIntentUrl(currentUrl);
+
+      // PostHog: how many visitors arrive inside the Facebook / Instagram browser (sent as a beacon, the page is about to leave).
+      track(AnalyticsEvents.inAppBrowserRedirect, { source: isFacebook ? 'facebook' : 'instagram' }, { instant: true });
 
       // Attempt the redirection.
       window.location.href = intentUrl;

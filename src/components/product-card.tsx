@@ -22,6 +22,9 @@ import { type ObjectId } from 'mongodb';
 import ProductTag from './product-tag';
 import ProductMedia from './product-media';
 import GamingIdModal from './gaming-id-modal';
+import { useProductImpression } from '@/hooks/use-product-impression';
+import { productProperties, track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 
 interface ProductCardProps {
@@ -29,6 +32,8 @@ interface ProductCardProps {
   user: User | null;
   orders: Order[];
   control: UserProductControl | undefined;
+  /** Index of the card in the visible grid (PostHog reports only). */
+  position?: number;
 }
 
 const LiveStock = ({ product }: { product: Product }) => {
@@ -199,16 +204,20 @@ const CountdownTimer = ({ endDate, isComingSoon }: { endDate: Date; isComingSoon
 };
 
 
-export default function ProductCard({ product, user, orders, control }: ProductCardProps) {
+export default function ProductCard({ product, user, orders, control, position }: ProductCardProps) {
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const { toast } = useToast();
+  // PostHog: how long this card is on screen (product_impression / product_attention).
+  const impressionRef = useProductImpression<HTMLDivElement>(product, position);
 
   const finalPrice = product.isCoinProduct 
     ? product.purchasePrice || product.price 
     : product.price - (product.coinsApplicable || 0);
 
   const handleBuyClick = () => {
+    // PostHog: every Buy tap, registered or not (guests are sent to the register popup).
+    track(AnalyticsEvents.productBuyClicked, productProperties(product, { position: position ?? null, final_price: finalPrice, registered: !!user }));
     if (!user) {
         toast({
             variant: 'destructive',
@@ -283,7 +292,7 @@ export default function ProductCard({ product, user, orders, control }: ProductC
 
   return (
     <>
-      <div className="relative">
+      <div className="relative" ref={impressionRef} data-ph-product-id={product._id.toString()} data-ph-product-name={product.name}>
         {product.tag && (
           <ProductTag tag={product.tag} color={product.tagColor} />
         )}

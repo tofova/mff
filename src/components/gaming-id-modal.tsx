@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,8 @@ import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import BannedNotice from './banned-notice';
 import { trackGoogleAdsSignup } from '@/lib/google-ads';
+import { identifyUser, track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 // Declare fbq for TypeScript
 declare global {
@@ -39,6 +41,10 @@ export default function GamingIdModal({ isOpen, onOpenChange }: GamingIdModalPro
   const router = useRouter();
   const isMobile = useIsMobile();
 
+  // PostHog: how often the register popup is shown.
+  useEffect(() => {
+    if (isOpen) track(AnalyticsEvents.registerModalOpened);
+  }, [isOpen]);
 
   const handleRegister = async () => {
     if (gamingId.length < 8 || gamingId.length > 11) {
@@ -59,12 +65,16 @@ export default function GamingIdModal({ isOpen, onOpenChange }: GamingIdModalPro
         id: result.user.visualGamingId || result.user.gamingId 
       });
       onOpenChange(false); // Close this modal to show the ban notice
+      track(AnalyticsEvents.registrationBanned, { source: 'gaming_id_modal' });
     } else if (result.success && result.user) {
       // Handle successful registration/login
       toast({
         title: 'Success',
         description: result.message,
       });
+      // PostHog: link everything this browser did so far to the Gaming ID, then record the sign-in.
+      identifyUser(result.user);
+      track(AnalyticsEvents.registrationCompleted, { source: 'gaming_id_modal', is_new: result.message.includes('5000 coins') });
       onOpenChange(false);
       // Check if it's a new registration by looking at the welcome message
       if (result.message.includes('5000 coins')) {
@@ -86,6 +96,7 @@ export default function GamingIdModal({ isOpen, onOpenChange }: GamingIdModalPro
         title: 'Error',
         description: result.message,
       });
+      track(AnalyticsEvents.registrationFailed, { source: 'gaming_id_modal', reason: result.message });
     }
     setIsLoading(false);
   };

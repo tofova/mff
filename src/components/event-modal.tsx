@@ -6,6 +6,9 @@ import type { Event } from '@/lib/definitions';
 import SmartImage from '@/components/smart-image';
 import { isVideoUrl } from '@/lib/media-urls';
 import { X } from 'lucide-react';
+import { useEffect } from 'react';
+import { track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 interface EventModalProps {
   event: Event;
@@ -29,6 +32,17 @@ const EventMedia = ({ src }: { src: string }) => {
 }
 
 export default function EventModal({ event, onClose }: EventModalProps) {
+  // PostHog: shown on mount, closed on unmount (the layout unmounts it when it is dismissed).
+  const eventId = String(event._id);
+  useEffect(() => {
+    const shownAt = Date.now();
+    track(AnalyticsEvents.eventModalShown, { event_id: eventId, media_url: event.imageUrl });
+    return () => {
+      track(AnalyticsEvents.eventModalClosed, { event_id: eventId, open_ms: Date.now() - shownAt });
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventId]);
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent hideCloseButton={true} className="p-0 bg-transparent border-none shadow-none max-w-xl w-full">

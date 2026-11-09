@@ -8,7 +8,9 @@ import { logoutUser } from '@/app/actions';
 import { Loader2, ShieldAlert, Mail, LogOut } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Alert, AlertTitle, AlertDescription } from './ui/alert';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { resetAnalytics, track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 interface BannedNoticeProps {
   isOpen: boolean;
@@ -22,6 +24,11 @@ export default function BannedNotice({ isOpen, onOpenChange, gamingId, banMessag
   const isMobile = useIsMobile();
   const { toast } = useToast();
 
+  // PostHog: how often people hit the ban screen.
+  useEffect(() => {
+    if (isOpen) track(AnalyticsEvents.bannedNoticeShown, { ban_message: banMessage });
+  }, [isOpen, banMessage]);
+
   const handleLogout = async () => {
     setIsLoggingOut(true);
     const result = await logoutUser();
@@ -30,6 +37,9 @@ export default function BannedNotice({ isOpen, onOpenChange, gamingId, banMessag
             title: "Logged Out",
             description: "You have been successfully logged out.",
         });
+        // PostHog: record the logout under this user, then detach the browser from them.
+        track(AnalyticsEvents.logout, { source: 'banned_notice' }, { instant: true });
+        resetAnalytics();
         // Reloading the page will clear all state and effectively log the user out from the client-side perspective
         window.location.reload(); 
     } else {

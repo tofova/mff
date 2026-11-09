@@ -6,6 +6,8 @@ import { getOrdersForUser, markOrderAsTracked } from '@/app/actions';
 import type { User } from '@/lib/definitions';
 import { trackGoogleAdsPurchase } from '@/lib/google-ads';
 import { useOptionalRefresh } from '@/context/RefreshContext';
+import { track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 // Declare fbq for TypeScript
 declare global {
@@ -89,6 +91,20 @@ export default function MetaPixelPurchaseTracker({ user }: MetaPixelPurchaseTrac
               value: order.finalPrice,
               productId: order.productId,
               productName: order.productName,
+            });
+
+            // PostHog: the same once-per-order moment as the Meta Pixel "Purchase".
+            track(AnalyticsEvents.purchaseCompleted, {
+              order_id: orderId,
+              product_id: order.productId,
+              product_name: order.productName,
+              value: order.finalPrice,
+              list_price: order.productPrice,
+              payment_method: order.paymentMethod,
+              coins_used: order.coinsUsed ?? 0,
+              order_status: order.status,
+              is_coin_product: !!order.isCoinProduct,
+              trigger: reason,
             });
 
             // Mark the order as tracked in the database to prevent future duplicate events.

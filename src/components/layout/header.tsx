@@ -19,6 +19,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 import { cn } from '@/lib/utils';
+import { resetAnalytics, track } from '@/lib/analytics/posthog-client';
+import { AnalyticsEvents } from '@/lib/analytics/events';
 
 
 interface HeaderProps {
@@ -41,6 +43,9 @@ export default function Header({ user, notifications, notificationKey, onNotific
         title: "Logged Out",
         description: "You have been successfully logged out.",
       });
+      // PostHog: record the logout under this user, then detach the browser from them.
+      track(AnalyticsEvents.logout, { source: 'header' }, { instant: true });
+      resetAnalytics();
       // After a successful logout, send the user to the home page (full navigation
       // so server state is refreshed just like the previous reload behavior).
       window.location.href = '/';
