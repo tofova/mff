@@ -148,6 +148,7 @@ export default function GamingIdModal({ isOpen, onOpenChange }: GamingIdModalPro
               <Label htmlFor="gaming-id-register">Gaming ID</Label>
               <Input
                 id="gaming-id-register"
+                data-ph-show-input
                 placeholder="Your in-game user ID"
                 value={gamingId}
                 onChange={handleInputChange}

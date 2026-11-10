@@ -21,7 +21,7 @@ import {
   POSTHOG_UI_HOST,
   REPLAY_MASK_CLASS,
 } from '@/lib/analytics/posthog-config';
-import { initialSuperProperties, maskNetworkRequest, pageArea } from '@/lib/analytics/posthog-client';
+import { initialSuperProperties, maskNetworkRequest, maskTypedText, pageArea } from '@/lib/analytics/posthog-client';
 import { AnalyticsEvents } from '@/lib/analytics/events';
 
 // Replay and heatmap payloads are left untouched; everything else is labelled.
@@ -59,8 +59,9 @@ function start(): void {
 
     enable_recording_console_log: true,
     session_recording: {
-      maskAllInputs: true, // everything typed into a field is hidden in replays
-      maskTextSelector: `.${REPLAY_MASK_CLASS}`, // Gaming IDs printed as text
+      maskAllInputs: true, // everything typed into a field is hidden in replays...
+      maskInputFn: maskTypedText, // ...except the boxes marked with data-ph-show-input
+      maskTextSelector: `.${REPLAY_MASK_CLASS}`, // admin backup codes printed as text
       recordCrossOriginIframes: false,
       recordHeaders: true,
       recordBody: true,

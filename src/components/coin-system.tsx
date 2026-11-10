@@ -278,7 +278,7 @@ export default function CoinSystem({ user: initialUser }: CoinSystemProps) {
                         return (
                             <div key={item._id.toString()} className="flex justify-between items-center text-sm p-3 rounded-md bg-muted/50">
                                 <div>
-                                    <p className="font-medium font-sans">Sent to: <span className="font-mono ph-mask">{item.gamingId}</span></p>
+                                    <p className="font-medium font-sans">Sent to: <span className="font-mono">{item.gamingId}</span></p>
                                     <p className="text-xs text-muted-foreground">
                                         <GiftHistoryFormattedDate dateString={item.createdAt as unknown as string} />
                                     </p>

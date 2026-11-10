@@ -277,7 +277,7 @@ export default function SecurityManager({ overview, telegramConfigured, telegram
           </DialogHeader>
           <ul className="grid gap-2 rounded-md bg-muted p-3 font-mono text-sm sm:grid-cols-2">
             {(newCodes ?? []).map((code) => (
-              <li key={code} className="rounded bg-background px-2 py-1 text-center tracking-wider">
+              <li key={code} className="rounded bg-background px-2 py-1 text-center tracking-wider ph-mask">
                 {code}
               </li>
             ))}

@@ -174,6 +174,7 @@ ${message}`;
             <Label htmlFor="gaming-id">Your Gaming ID</Label>
             <Input
               id="gaming-id"
+              data-ph-show-input
               placeholder="Enter your Gaming ID"
               value={gamingId}
               onChange={(e) => setGamingId(e.target.value.replace(/\D/g, ''))}
@@ -186,6 +187,7 @@ ${message}`;
             <Label htmlFor="contact-number">Contact Number</Label>
             <Input
               id="contact-number"
+              data-ph-show-input
               placeholder="Enter your contact number"
               value={contactNumber}
               onChange={handleContactNumberChange}
@@ -198,6 +200,7 @@ ${message}`;
             <Label htmlFor="transaction-id">UTR/Transaction ID</Label>
             <Input
               id="transaction-id"
+              data-ph-show-input
               placeholder="Enter your transaction ID"
               value={transactionId}
               onChange={(e) => setTransactionId(e.target.value)}
@@ -208,6 +211,7 @@ ${message}`;
             <Label htmlFor="message">Why do you want a refund?</Label>
             <Textarea
               id="message"
+              data-ph-show-input
               placeholder="Please describe the issue..."
               rows={5}
               value={message}

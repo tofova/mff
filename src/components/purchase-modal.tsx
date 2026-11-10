@@ -314,7 +314,7 @@ export default function PurchaseModal({ product, user: initialUser, onClose }: P
                 <div className="space-y-4 pt-4">
                     <div className="space-y-2">
                         <Label htmlFor="gaming-id-register">Gaming ID</Label>
-                        <Input id="gaming-id-register" placeholder="Your in-game user ID" value={gamingId} onChange={e => setGamingId(e.target.value.replace(/\D/g, ''))} type="tel" pattern="[0-9]*" />
+                        <Input id="gaming-id-register" placeholder="Your in-game user ID" value={gamingId} onChange={e => setGamingId(e.target.value.replace(/\D/g, ''))} type="tel" pattern="[0-9]*" data-ph-show-input />
                     </div>
                     <Button onClick={handleRegister} className="w-full" disabled={isLoading}>
                         {isLoading ? <Loader2 className="animate-spin" /> : 'Register & Continue'}
@@ -372,7 +372,7 @@ export default function PurchaseModal({ product, user: initialUser, onClose }: P
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="gaming-id">Gaming ID</Label>
-                    <Input id="gaming-id" value={user.visualGamingId || user.gamingId} readOnly disabled />
+                    <Input id="gaming-id" value={user.visualGamingId || user.gamingId} readOnly disabled data-ph-show-input />
                 </div>
                 <div className="space-y-2">
                    <Button onClick={handleBuyWithUpi} className="w-full font-sans" disabled={isLoading}>
