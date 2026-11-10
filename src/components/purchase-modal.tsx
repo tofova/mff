@@ -67,15 +67,15 @@ export default function PurchaseModal({ product, user: initialUser, onClose }: P
   // PostHog: the current step, readable from callbacks without changing their dependencies.
   const stepRef = useRef<ModalStep>(step);
   stepRef.current = step;
+  // PostHog: checkout_closed means "the buyer closed the popup". It is sent at most once per
+  // popup, and never when the site closed it by itself (QR timer, not eligible): those cases
+  // have their own events.
+  const closeEventDone = useRef(false);
   const analyticsProps = (extra?: Record<string, unknown>) =>
     productProperties(product, { final_price: finalPrice, convenience_fee: convenienceFee, ...extra });
 
   const handleClose = useCallback(() => {
     setIsOpen(false);
-    // PostHog: where in the flow the buyer closed the modal (the success step closes by itself).
-    if (stepRef.current !== 'success') {
-      track(AnalyticsEvents.checkoutClosed, productProperties(product, { last_step: stepRef.current, had_payment_lock: !!paymentLockId }));
-    }
     if (pollingInterval.current) {
         clearInterval(pollingInterval.current);
     }
@@ -83,6 +83,16 @@ export default function PurchaseModal({ product, user: initialUser, onClose }: P
         releasePaymentLock(paymentLockId);
     }
     setTimeout(onClose, 300); // Allow for closing animation
+    // PostHog: kept last, after the payment session is released, and unable to throw into the
+    // lines above. Where in the flow the buyer closed the popup (success closes by itself).
+    try {
+      if (!closeEventDone.current && stepRef.current !== 'success') {
+        closeEventDone.current = true;
+        track(AnalyticsEvents.checkoutClosed, productProperties(product, { last_step: stepRef.current, had_payment_lock: !!paymentLockId }));
+      }
+    } catch {
+      /* tracking must never affect the popup */
+    }
   }, [onClose, paymentLockId]);
   
   // Countdown timer for QR code
@@ -99,13 +109,20 @@ export default function PurchaseModal({ product, user: initialUser, onClose }: P
   // Effect to handle session expiration
   useEffect(() => {
     if (qrCountdown <= 0 && step === 'qrPayment') {
-      track(AnalyticsEvents.checkoutQrExpired, productProperties(product, { final_price: finalPrice }));
+      // PostHog: the timer closed the popup, not the buyer, so no checkout_closed is sent.
+      const firstExpiry = !closeEventDone.current;
+      closeEventDone.current = true;
       toast({
         variant: 'destructive',
         title: 'Session Expired',
         description: 'Your payment session has expired. Please try again.',
       });
       handleClose();
+      try {
+        if (firstExpiry) track(AnalyticsEvents.checkoutQrExpired, productProperties(product, { final_price: finalPrice }));
+      } catch {
+        /* tracking must never affect the popup */
+      }
     }
   }, [qrCountdown, step, handleClose, toast]);
 
@@ -155,6 +172,8 @@ export default function PurchaseModal({ product, user: initialUser, onClose }: P
                     }
                     setStep('details');
                 } else {
+                    // PostHog: closed by the eligibility check, not by the buyer: no checkout_closed.
+                    closeEventDone.current = true;
                     track(AnalyticsEvents.checkoutNotEligible, productProperties(product, { reason: result.message }));
                     toast({
                         variant: 'destructive',
