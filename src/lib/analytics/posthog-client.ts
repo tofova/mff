@@ -10,7 +10,7 @@
 import posthog from 'posthog-js';
 import type { CapturedNetworkRequest } from 'posthog-js';
 import type { Product, User } from '@/lib/definitions';
-import { POSTHOG_ENABLED } from './posthog-config';
+import { POSTHOG_ENABLED, REPLAY_SHOW_INPUT_ATTR } from './posthog-config';
 import type { AnalyticsEventName } from './events';
 
 export type Properties = Record<string, unknown>;
@@ -116,19 +116,56 @@ export function productProperties(product: ProductLike, extra?: Properties): Pro
   };
 }
 
-// Anything a buyer types that must never end up in a replay's network panel:
-// passwords, gift passwords, redeem codes, UTR numbers, tokens.
-const SENSITIVE_PAYLOAD = /password|giftpassword|redeemcode|redeem_code|\butr\b|secret|token/i;
+// Anything that must never end up in a replay's network panel:
+// passwords, gift passwords, redeem codes, UTR numbers, tokens, admin backup codes.
+const SENSITIVE_PAYLOAD = /password|giftpassword|redeemcode|redeem_code|\butr\b|secret|token|backup[\s_-]?codes?/i;
 const SENSITIVE_HEADER = /cookie|authorization|x-api-key/i;
+// Pages whose traffic is nothing but secrets (admin sign-in codes, backup codes,
+// password changes): their request and response bodies are never kept.
+const ALWAYS_MASKED_PATHS = ['/admin/login', '/admin/security'];
+const MASKED_BODY = '[masked by site]';
+
+function isAlwaysMaskedUrl(name: unknown): boolean {
+  try {
+    const path = new URL(String(name ?? ''), window.location.origin).pathname;
+    return ALWAYS_MASKED_PATHS.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * What a replay shows for text typed into a box. Everything is hidden (one star
+ * per character) unless the box carries the REPLAY_SHOW_INPUT_ATTR attribute.
+ * Password boxes stay hidden even if they were marked by mistake.
+ */
+export function maskTypedText(text: string, element?: HTMLElement): string {
+  const value = typeof text === 'string' ? text : '';
+  try {
+    if (
+      element &&
+      typeof element.hasAttribute === 'function' &&
+      element.hasAttribute(REPLAY_SHOW_INPUT_ATTR) &&
+      (element.getAttribute('type') || '').toLowerCase() !== 'password' &&
+      !element.hasAttribute('data-rr-is-password')
+    ) {
+      return value;
+    }
+  } catch {
+    /* fall through: hide */
+  }
+  return '*'.repeat(value.length);
+}
 
 /** Scrubs sensitive data from network requests before they are stored with a replay. */
 export function maskNetworkRequest(data: CapturedNetworkRequest): CapturedNetworkRequest | null {
   try {
-    if (typeof data.requestBody === 'string' && SENSITIVE_PAYLOAD.test(data.requestBody)) {
-      data.requestBody = '[masked by site]';
+    const alwaysMasked = isAlwaysMaskedUrl(data.name);
+    if (typeof data.requestBody === 'string' && (alwaysMasked || SENSITIVE_PAYLOAD.test(data.requestBody))) {
+      data.requestBody = MASKED_BODY;
     }
-    if (typeof data.responseBody === 'string' && SENSITIVE_PAYLOAD.test(data.responseBody)) {
-      data.responseBody = '[masked by site]';
+    if (typeof data.responseBody === 'string' && (alwaysMasked || SENSITIVE_PAYLOAD.test(data.responseBody))) {
+      data.responseBody = MASKED_BODY;
     }
     for (const headers of [data.requestHeaders, data.responseHeaders]) {
       if (!headers || typeof headers !== 'object') continue;

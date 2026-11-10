@@ -30,7 +30,7 @@ export const AnalyticsEvents = {
   checkoutRedeemSubmitted: 'checkout_redeem_submitted',
   checkoutRedeemFailed: 'checkout_redeem_failed',
   checkoutQrExpired: 'checkout_qr_expired',
-  checkoutClosed: 'checkout_closed',
+  checkoutClosed: 'checkout_closed', // the buyer closed the popup; once per popup, never for timer or eligibility closes
   checkoutSuccessSeen: 'checkout_success_seen',
   purchaseCompleted: 'purchase_completed', // same moment as the Meta Pixel "Purchase"
 

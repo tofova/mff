@@ -1009,6 +1009,7 @@ export default function SupportClient({ initialUser, initialTickets }: SupportCl
             </DropdownMenu>
             <Textarea
               ref={chatTextareaRef}
+              data-ph-show-input
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               placeholder="Type a message"
@@ -1087,6 +1088,7 @@ export default function SupportClient({ initialUser, initialTickets }: SupportCl
               </label>
               <Textarea
                 ref={newTextareaRef}
+                data-ph-show-input
                 autoFocus
                 value={newMessage}
                 onChange={(e) => {
@@ -1173,7 +1175,7 @@ export default function SupportClient({ initialUser, initialTickets }: SupportCl
             <h1 className="text-2xl font-bold font-headline">Garena Support</h1>
             <Image src="/img/bluetick.gif" alt="Verified" width={20} height={20} className="h-5 w-5" />
           </div>
-          <p className="text-sm text-muted-foreground ph-mask">
+          <p className="text-sm text-muted-foreground">
             {initialUser
               ? `Logged in as ${initialUser.visualGamingId || initialUser.gamingId}`
               : 'Create a report and chat with our team'}

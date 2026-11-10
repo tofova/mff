@@ -28,3 +28,9 @@ export const POSTHOG_ENABLED: boolean =
 
 /** Elements with this class have their TEXT masked in session replays. */
 export const REPLAY_MASK_CLASS = 'ph-mask';
+
+/**
+ * Input boxes carrying this attribute show their typed text in session replays.
+ * Every other box stays hidden (stars). See maskTypedText in posthog-client.ts.
+ */
+export const REPLAY_SHOW_INPUT_ATTR = 'data-ph-show-input';

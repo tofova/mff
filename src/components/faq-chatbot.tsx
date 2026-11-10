@@ -322,6 +322,7 @@ export default function FaqChatbot() {
               </Button>
               <Textarea
                 ref={textareaRef}
+                data-ph-show-input
                 placeholder="Ask a question..."
                 disabled={isLoading || isHistoryLoading}
                 className="resize-none max-h-32 min-h-10"

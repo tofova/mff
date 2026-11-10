@@ -289,7 +289,7 @@ export default function LoginForm() {
       </div>
       <ul className="grid gap-2 rounded-md bg-muted p-3 font-mono text-sm sm:grid-cols-2">
         {backupCodes.map((item) => (
-          <li key={item} className="rounded bg-background px-2 py-1 text-center tracking-wider">
+          <li key={item} className="rounded bg-background px-2 py-1 text-center tracking-wider ph-mask">
             {item}
           </li>
         ))}
