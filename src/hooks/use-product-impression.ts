@@ -4,8 +4,11 @@
 // Attach the returned ref to a product card. The hook reports:
 //   product_impression  once per card per page, when the card has been at least
 //                       half visible for 0.5 s (a fast scroll past it does not count);
-//   product_attention   every time the card leaves the screen (scrolled away,
-//                       tab hidden, page closed, card removed), with visible_ms.
+//   product_attention   when the card leaves the screen (scrolled away, tab hidden,
+//                       page closed, card removed) after staying at least half
+//                       visible for 2 s or longer in one go, with visible_ms.
+//                       A scroll past the card, even a slow one, is an impression
+//                       but not attention: the buyer has to stop on it.
 // Summing visible_ms per product gives "which product do people look at longest".
 // The hook does nothing in browsers without IntersectionObserver and never throws.
 
@@ -15,7 +18,9 @@ import { AnalyticsEvents } from '@/lib/analytics/events';
 
 const VISIBLE_RATIO = 0.5;
 const IMPRESSION_AFTER_MS = 500;
-const MIN_ATTENTION_MS = 300;
+// A buyer has to keep the card on screen this long before it counts as attention.
+// Shorter looks send no product_attention event at all (product_impression still counts them).
+const MIN_ATTENTION_MS = 2000;
 
 export function useProductImpression<T extends HTMLElement>(product: ProductLike, position?: number) {
   const ref = useRef<T | null>(null);
