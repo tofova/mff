@@ -5,7 +5,7 @@
 export const AnalyticsEvents = {
   // Product grid (home page)
   productImpression: 'product_impression', // card was >= 50% visible for >= 0.5 s
-  productAttention: 'product_attention', // card left the screen: how long it was visible
+  productAttention: 'product_attention', // card left the screen after being visible for >= 2 s: how long it was visible
   productBuyClicked: 'product_buy_clicked',
   categorySelected: 'category_selected',
   productSearched: 'product_searched',

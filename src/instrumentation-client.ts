@@ -9,8 +9,11 @@
 // Admin pages are recorded too for now; their events carry page_area=admin so
 // they can be filtered out in reports.
 //
-// Switching everything off: set NEXT_PUBLIC_POSTHOG_DISABLED=true and redeploy,
-// or turn individual features off in the PostHog project settings (no deploy).
+// Switching everything off: set NEXT_PUBLIC_POSTHOG_DISABLED=true and redeploy
+// (Dokploy: as a Build-time Argument), or turn individual features off in the
+// PostHog project settings (no deploy).
+// Which PostHog account receives the data is set the same way, with build-time
+// variables: see src/lib/analytics/posthog-config.ts.
 
 import posthog from 'posthog-js';
 import type { CaptureResult } from 'posthog-js';
